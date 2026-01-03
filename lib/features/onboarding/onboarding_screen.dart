@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../auth/login_screen.dart';
+import '../auth/auth_screen.dart';
 import '../../services/local_storage_service.dart';
 
 class OnboardingScreen extends StatefulWidget {
@@ -15,7 +15,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   final LocalStorageService _storage = LocalStorageService();
 
-  // onboarding data-image paths and text
   final List<Map<String, String>> _onboardingData = [
     {
       "image": "assets/images/onboarding1.png",
@@ -29,16 +28,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     },
     {
       "image": "assets/images/onboarding3.png",
-      "title": "create lotteries easily",
-      "desc": "discover your luck with family,friends,coworkers and more.",
+      "title": "Create lotteries easily",
+      "desc":
+          "Discover your luck with family, friends, coworkers and more.",
     },
   ];
 
   void _finishOnboarding() async {
     await _storage.setSeenOnboarding(true);
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      MaterialPageRoute(builder: (_) => const AuthScreen()),
     );
   }
 
@@ -61,9 +62,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             itemBuilder: (context, index) {
               final data = _onboardingData[index];
               return Padding(
-                padding: const EdgeInsets.all(20.0),
+                padding: const EdgeInsets.all(20),
                 child: Column(
-                     mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     SizedBox(
                       height: screenHeight * 0.45,
@@ -94,17 +95,17 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               );
             },
-       ),
+          ),
 
-// Bottom controls
- Positioned(
+          // Bottom controls
+          Positioned(
             bottom: screenHeight * 0.08,
             left: 20,
             right: 20,
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // Skip button
+                // Skip
                 _currentPage != _onboardingData.length - 1
                     ? TextButton(
                         onPressed: _finishOnboarding,
@@ -113,9 +114,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           style: TextStyle(color: Colors.black),
                         ),
                       )
-                    : const SizedBox(width: 60), // Placeholder
+                    : const SizedBox(width: 60),
 
-                // Page indicators
+                // Indicators
                 Row(
                   children: List.generate(
                     _onboardingData.length,
@@ -125,14 +126,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       width: _currentPage == index ? 20 : 8,
                       height: 8,
                       decoration: BoxDecoration(
-                        color: _currentPage == index ? Colors.green : Colors.grey,
+                        color: _currentPage == index
+                            ? Colors.green
+                            : Colors.grey,
                         borderRadius: BorderRadius.circular(4),
                       ),
                     ),
                   ),
                 ),
 
-                // Next / Get Started button
+                // Next / Get Started
                 TextButton(
                   onPressed: () {
                     if (_currentPage == _onboardingData.length - 1) {

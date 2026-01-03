@@ -1,18 +1,16 @@
+
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 class LocalStorageService {
-  static const String _onboardingKey = 'seen_onboarding';
-
-  /// Save that user has seen the onboarding
-  Future<void> setSeenOnboarding(bool seen) async {
+  /// Save that the onboarding has been seen
+  Future<void> setSeenOnboarding(bool value) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool(_onboardingKey, seen);
+    await prefs.setBool('seenOnboarding', value);
   }
 
-  /// Check if user has seen the onboarding
-  Future<bool> hasSeenOnboarding() async {
+  /// Check if onboarding was already seen
+  Future<bool> getSeenOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool(_onboardingKey) ?? false;
+    return prefs.getBool('seenOnboarding') ?? false;
   }
 }
