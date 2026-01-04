@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'register_screen.dart'; // <-- new registration page
+import 'widgets/auth_providers.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -10,21 +10,94 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   bool isSignIn = true;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
 
+  // Controllers
+  final TextEditingController fullNameController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
-  bool passwordVisible = false;
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
+
+  // Error messages
+  String fullNameError = '';
+  String phoneError = '';
+  String emailError = '';
+  String passwordError = '';
+  String confirmPasswordError = '';
 
   void toggleMode() {
     setState(() {
       isSignIn = !isSignIn;
+      // Reset errors when toggling
+      fullNameError = '';
+      phoneError = '';
+      emailError = '';
+      passwordError = '';
+      confirmPasswordError = '';
     });
   }
 
-  @override
-  void initState() {
-    super.initState();
-    passwordVisible = false;
+  bool _validateInputs() {
+    bool valid = true;
+
+    setState(() {
+      // Reset errors
+      fullNameError = '';
+      phoneError = '';
+      emailError = '';
+      passwordError = '';
+      confirmPasswordError = '';
+
+      // Full Name (register)
+      if (!isSignIn && fullNameController.text.isEmpty) {
+        fullNameError = '* Full Name required';
+        valid = false;
+      }
+
+      // Phone (register)
+      if (!isSignIn) {
+        if (phoneController.text.isEmpty) {
+          phoneError = '* Phone required';
+          valid = false;
+        } else if (!RegExp(r'^\d+$').hasMatch(phoneController.text)) {
+          phoneError = '* Invalid phone number';
+          valid = false;
+        }
+      }
+
+      // Email
+      if (emailController.text.isEmpty) {
+        emailError = '* Email required';
+        valid = false;
+      } else if (!emailController.text.contains('@') ||
+          !emailController.text.contains('.com')) {
+        emailError = '* Invalid email address';
+        valid = false;
+      }
+
+      // Password
+      if (passwordController.text.isEmpty) {
+        passwordError = '* Password required';
+        valid = false;
+      }
+
+      // Confirm password (register)
+      if (!isSignIn) {
+        if (confirmPasswordController.text.isEmpty) {
+          confirmPasswordError = '* Confirm password required';
+          valid = false;
+        } else if (passwordController.text !=
+            confirmPasswordController.text) {
+          confirmPasswordError = '* Passwords do not match';
+          valid = false;
+        }
+      }
+    });
+
+    return valid;
   }
 
   @override
@@ -56,7 +129,8 @@ class _AuthScreenState extends State<AuthScreen> {
                         child: Container(
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color: isSignIn ? primaryColor : Colors.transparent,
+                            color:
+                                isSignIn ? primaryColor : Colors.transparent,
                             borderRadius: BorderRadius.circular(25),
                           ),
                           child: Text(
@@ -72,14 +146,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
-                          if (isSignIn) {
-                            // Navigate to RegisterScreen
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                  builder: (_) => const RegisterScreen()),
-                            );
-                          }
+                          if (isSignIn) toggleMode();
                         },
                         child: Container(
                           alignment: Alignment.center,
@@ -90,7 +157,8 @@ class _AuthScreenState extends State<AuthScreen> {
                           child: Text(
                             'Register',
                             style: TextStyle(
-                              color: !isSignIn ? Colors.white : Colors.grey.shade700,
+                              color:
+                                  !isSignIn ? Colors.white : Colors.grey.shade700,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -100,7 +168,71 @@ class _AuthScreenState extends State<AuthScreen> {
                   ],
                 ),
               ),
+
               const SizedBox(height: 24),
+
+              // Full Name (register)
+              if (!isSignIn)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Full Name', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: fullNameController,
+                      decoration: InputDecoration(
+                        hintText: 'full name',
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    if (fullNameError.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          fullNameError,
+                          style: const TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
+
+              // Phone (register)
+              if (!isSignIn)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Phone', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        hintText: '09........',
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                    if (phoneError.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          phoneError,
+                          style: const TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
 
               // Email field
               const Text('Email Address', style: TextStyle(fontWeight: FontWeight.w500)),
@@ -117,6 +249,14 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                 ),
               ),
+              if (emailError.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Text(
+                    emailError,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                  ),
+                ),
               const SizedBox(height: 16),
 
               // Password field
@@ -124,7 +264,7 @@ class _AuthScreenState extends State<AuthScreen> {
               const SizedBox(height: 8),
               TextField(
                 controller: passwordController,
-                obscureText: !passwordVisible,
+                obscureText: _obscurePassword,
                 decoration: InputDecoration(
                   hintText: '••••••••',
                   filled: true,
@@ -135,35 +275,75 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                   suffixIcon: IconButton(
                     icon: Icon(
-                        passwordVisible ? Icons.visibility : Icons.visibility_off,
-                        color: Colors.grey.shade400),
+                        _obscurePassword ? Icons.visibility_off : Icons.visibility),
                     onPressed: () {
                       setState(() {
-                        passwordVisible = !passwordVisible;
+                        _obscurePassword = !_obscurePassword;
                       });
                     },
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
-
-              // Forgot Password
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {},
-                  child: const Text(
-                    'Forgot?',
-                    style: TextStyle(color: Colors.blue),
+              if (passwordError.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(top: 4.0),
+                  child: Text(
+                    passwordError,
+                    style: const TextStyle(color: Colors.red, fontSize: 12),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 16),
+
+              // Confirm password (register)
+              if (!isSignIn)
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Confirm Password', style: TextStyle(fontWeight: FontWeight.w500)),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: confirmPasswordController,
+                      obscureText: _obscureConfirm,
+                      decoration: InputDecoration(
+                        hintText: '••••••••',
+                        filled: true,
+                        fillColor: Colors.grey.shade100,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                          borderSide: BorderSide.none,
+                        ),
+                        suffixIcon: IconButton(
+                          icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                          onPressed: () {
+                            setState(() {
+                              _obscureConfirm = !_obscureConfirm;
+                            });
+                          },
+                        ),
+                      ),
+                    ),
+                    if (confirmPasswordError.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 4.0),
+                        child: Text(
+                          confirmPasswordError,
+                          style: const TextStyle(color: Colors.red, fontSize: 12),
+                        ),
+                      ),
+                    const SizedBox(height: 16),
+                  ],
+                ),
 
               // Enter button
               ElevatedButton(
                 onPressed: () {
-                  // Sign In action
+                  if (_validateInputs()) {
+                    if (isSignIn) {
+                      // Log in
+                    } else {
+                      // Register
+                    }
+                  }
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
@@ -172,9 +352,9 @@ class _AuthScreenState extends State<AuthScreen> {
                   ),
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text(
-                  'Enter LuckyEta',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                child: Text(
+                  isSignIn ? 'Enter LuckyEta' : 'Create Account',
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
               const SizedBox(height: 24),
@@ -193,64 +373,7 @@ class _AuthScreenState extends State<AuthScreen> {
               const SizedBox(height: 16),
 
               // Social buttons
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: Image.asset(
-                        'assets/icons/apple.png',
-                        height: 20,
-                        width: 20,
-                      ),
-                      label: const Text('Apple', style: TextStyle(fontWeight: FontWeight.bold)),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.grey.shade300),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: Image.asset(
-                        'assets/icons/google.png',
-                        height: 20,
-                        width: 20,
-                      ),
-                      label: const Text('Google', style: TextStyle(fontWeight: FontWeight.bold)),
-                      style: OutlinedButton.styleFrom(
-                        side: BorderSide(color: Colors.grey.shade300),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 24),
-
-              // Bottom secure text
-              Column(
-                children: const [
-                  Text(
-                    '256-BIT SECURE CONNECTION',
-                    style: TextStyle(
-                      color: Colors.green,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  SizedBox(height: 6),
-                  Text('Terms of Service • Privacy Policy',
-                      style: TextStyle(color: Colors.grey, fontSize: 12)),
-                ],
-              ),
+              const AuthProviders(),
             ],
           ),
         ),
