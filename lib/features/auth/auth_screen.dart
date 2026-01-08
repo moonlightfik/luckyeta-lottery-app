@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'widgets/auth_providers.dart';
+import '../../navigation/bottom_nav_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -12,6 +14,9 @@ class _AuthScreenState extends State<AuthScreen> {
   bool isSignIn = true;
   bool _obscurePassword = true;
   bool _obscureConfirm = true;
+  bool isLoading = false;
+
+  final _auth = FirebaseAuth.instance;
 
   // Controllers
   final TextEditingController fullNameController = TextEditingController();
@@ -31,7 +36,6 @@ class _AuthScreenState extends State<AuthScreen> {
   void toggleMode() {
     setState(() {
       isSignIn = !isSignIn;
-      // Reset errors when toggling
       fullNameError = '';
       phoneError = '';
       emailError = '';
@@ -44,7 +48,6 @@ class _AuthScreenState extends State<AuthScreen> {
     bool valid = true;
 
     setState(() {
-      // Reset errors
       fullNameError = '';
       phoneError = '';
       emailError = '';
@@ -62,8 +65,8 @@ class _AuthScreenState extends State<AuthScreen> {
         if (phoneController.text.isEmpty) {
           phoneError = '* Phone required';
           valid = false;
-        } else if (!RegExp(r'^\d+$').hasMatch(phoneController.text)) {
-          phoneError = '* Invalid phone number';
+        } else if (!RegExp(r'^(09|07)\d{8}$').hasMatch(phoneController.text)) {
+          phoneError = '* Phone must start with 09 or 07 and be 10 digits';
           valid = false;
         }
       }
@@ -100,6 +103,66 @@ class _AuthScreenState extends State<AuthScreen> {
     return valid;
   }
 
+  Future<void> _submit() async {
+    if (!_validateInputs()) return;
+
+    setState(() => isLoading = true);
+
+    try {
+      if (isSignIn) {
+        // Log in
+        await _auth.signInWithEmailAndPassword(
+          email: emailController.text.trim(),
+          password: passwordController.text.trim(),
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Login successful')),
+        );
+      } else {
+        // Register
+        await _auth.createUserWithEmailAndPassword(
+          email: emailController.text.trim(),
+          password: passwordController.text.trim(),
+        );
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account created successfully')),
+        );
+      }
+
+      // ✅ Navigate to BottomNavScreen after login/register
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const BottomNavScreen()),
+        );
+      }
+
+    } on FirebaseAuthException catch (e) {
+      String message = '';
+      if (e.code == 'user-not-found') {
+        message = 'Account does not exist';
+      } else if (e.code == 'wrong-password') {
+        message = 'Wrong password';
+      } else if (e.code == 'email-already-in-use') {
+        message = 'Email already in use';
+      } else {
+        message = 'Authentication failed: ${e.message}';
+      }
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Colors.blue.shade600;
@@ -129,8 +192,7 @@ class _AuthScreenState extends State<AuthScreen> {
                         child: Container(
                           alignment: Alignment.center,
                           decoration: BoxDecoration(
-                            color:
-                                isSignIn ? primaryColor : Colors.transparent,
+                            color: isSignIn ? primaryColor : Colors.transparent,
                             borderRadius: BorderRadius.circular(25),
                           ),
                           child: Text(
@@ -157,8 +219,7 @@ class _AuthScreenState extends State<AuthScreen> {
                           child: Text(
                             'Register',
                             style: TextStyle(
-                              color:
-                                  !isSignIn ? Colors.white : Colors.grey.shade700,
+                              color: !isSignIn ? Colors.white : Colors.grey.shade700,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -274,8 +335,7 @@ class _AuthScreenState extends State<AuthScreen> {
                     borderSide: BorderSide.none,
                   ),
                   suffixIcon: IconButton(
-                    icon: Icon(
-                        _obscurePassword ? Icons.visibility_off : Icons.visibility),
+                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                     onPressed: () {
                       setState(() {
                         _obscurePassword = !_obscurePassword;
@@ -336,15 +396,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
               // Enter button
               ElevatedButton(
-                onPressed: () {
-                  if (_validateInputs()) {
-                    if (isSignIn) {
-                      // Log in
-                    } else {
-                      // Register
-                    }
-                  }
-                },
+                onPressed: isLoading ? null : _submit,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: primaryColor,
                   shape: RoundedRectangleBorder(
@@ -373,7 +425,10 @@ class _AuthScreenState extends State<AuthScreen> {
               const SizedBox(height: 16),
 
               // Social buttons
-              const AuthProviders(),
+              AuthProviders(
+                onGoogleTap: () {}, // empty for now
+                onAppleTap: () {},  //  empty for now
+              ),
             ],
           ),
         ),

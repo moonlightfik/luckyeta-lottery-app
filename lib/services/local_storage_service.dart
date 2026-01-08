@@ -1,4 +1,3 @@
-
 import 'package:shared_preferences/shared_preferences.dart';
 
 class LocalStorageService {
@@ -10,6 +9,12 @@ class LocalStorageService {
 
   /// Check if onboarding was already seen
   Future<bool> getSeenOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('seenOnboarding') ?? false;
+  }
+
+  /// Alias helper (always returns a bool)
+  Future<bool> isOnboardingCompleted() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('seenOnboarding') ?? false;
   }

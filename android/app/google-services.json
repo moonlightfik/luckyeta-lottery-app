@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "408098838732",
+    "project_id": "lottery-app-d7959",
+    "storage_bucket": "lottery-app-d7959.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:408098838732:android:e7f30bc00de9f398750a69",
+        "android_client_info": {
+          "package_name": "com.example.luckyeta"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC6dWJ4GXfpsd39G9Of8JaXWHVQI-GzL4Y"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

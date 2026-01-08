@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../services/local_storage_service.dart';
 import '../onboarding/onboarding_screen.dart';
+import '../auth/auth_screen.dart';
+import '../home/home_screen.dart';
 
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
@@ -38,9 +41,10 @@ class _SplashScreenState extends State<SplashScreen>
     _luckyController.forward();
 
     // Eta slide + fade
-    _etaController =
-        AnimationController(vsync: this, duration: const Duration(milliseconds: 900));
-    _etaSlide = Tween<Offset>(begin: const Offset(1.5, 0), end: Offset.zero).animate(
+    _etaController = AnimationController(
+        vsync: this, duration: const Duration(milliseconds: 900));
+    _etaSlide =
+        Tween<Offset>(begin: const Offset(1.5, 0), end: Offset.zero).animate(
       CurvedAnimation(parent: _etaController, curve: Curves.easeOutBack),
     );
     _etaFade = Tween<double>(begin: 0, end: 1).animate(
@@ -70,11 +74,25 @@ class _SplashScreenState extends State<SplashScreen>
   Future<void> _navigateNext() async {
     await Future.delayed(const Duration(seconds: 3));
 
-    // Navigate to onboarding
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => const OnboardingScreen()),
-    );
+    final seenOnboarding = await _storage.getSeenOnboarding();
+    final user = FirebaseAuth.instance.currentUser;
+
+    if (!seenOnboarding) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const OnboardingScreen()),
+      );
+    } else if (user != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomeScreen()),
+      );
+    } else {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const AuthScreen()),
+      );
+    }
   }
 
   @override
@@ -87,10 +105,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final gradient = const LinearGradient(
-      colors: [Colors.green, Colors.red],
-    );
-
+    final gradient = const LinearGradient(colors: [Colors.green, Colors.red]);
     final screenWidth = MediaQuery.of(context).size.width;
     final fontSize = screenWidth * 0.12;
 
@@ -115,7 +130,6 @@ class _SplashScreenState extends State<SplashScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // Lucky pop
                 ScaleTransition(
                   scale: _luckyScale,
                   child: ShaderMask(
@@ -132,8 +146,6 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ),
                 ),
-
-                // Eta slide + fade
                 SlideTransition(
                   position: _etaSlide,
                   child: FadeTransition(

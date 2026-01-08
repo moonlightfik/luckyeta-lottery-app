@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'auth_screen.dart'; // The login/auth screen
+import 'package:firebase_auth/firebase_auth.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -9,35 +9,92 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  bool isRegister = true;
+  bool _obscurePassword = true;
+  bool _obscureConfirm = true;
+  bool _isLoading = false;
 
   final TextEditingController fullNameController = TextEditingController();
-  final TextEditingController emailController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
   final TextEditingController confirmController = TextEditingController();
 
-  bool passwordVisible = false;
-  bool confirmVisible = false;
+  String fullNameError = '';
+  String phoneError = '';
+  String emailError = '';
+  String passwordError = '';
+  String confirmError = '';
+  String firebaseError = '';
 
-  void toggleMode() {
+  bool _validateInputs() {
+    bool valid = true;
+
     setState(() {
-      isRegister = !isRegister;
+      fullNameError = '';
+      phoneError = '';
+      emailError = '';
+      passwordError = '';
+      confirmError = '';
+      firebaseError = '';
+
+      if (fullNameController.text.isEmpty) {
+        fullNameError = '* Full Name required';
+        valid = false;
+      }
+
+      if (phoneController.text.isEmpty) {
+        phoneError = '* Phone required';
+        valid = false;
+      } else if (!RegExp(r'^\d+$').hasMatch(phoneController.text)) {
+        phoneError = '* Invalid phone number';
+        valid = false;
+      }
+
+      if (emailController.text.isEmpty) {
+        emailError = '* Email required';
+        valid = false;
+      } else if (!emailController.text.contains('@') || !emailController.text.contains('.com')) {
+        emailError = '* Invalid email address';
+        valid = false;
+      }
+
+      if (passwordController.text.isEmpty) {
+        passwordError = '* Password required';
+        valid = false;
+      }
+
+      if (confirmController.text.isEmpty) {
+        confirmError = '* Confirm password required';
+        valid = false;
+      } else if (passwordController.text != confirmController.text) {
+        confirmError = '* Passwords do not match';
+        valid = false;
+      }
     });
-    if (!isRegister) {
-      // Go back to AuthScreen
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const AuthScreen()),
-      );
-    }
+
+    return valid;
   }
 
-  @override
-  void initState() {
-    super.initState();
-    passwordVisible = false;
-    confirmVisible = false;
+  Future<void> _register() async {
+    if (!_validateInputs()) return;
+
+    setState(() => _isLoading = true);
+
+    try {
+      await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
+
+      await FirebaseAuth.instance.currentUser!.updateDisplayName(fullNameController.text.trim());
+
+      // Navigate back to login
+      Navigator.pop(context);
+    } on FirebaseAuthException catch (e) {
+      setState(() => firebaseError = e.message ?? 'An error occurred');
+    } finally {
+      setState(() => _isLoading = false);
+    }
   }
 
   @override
@@ -47,225 +104,134 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             const SizedBox(height: 40),
-
-            // Toggle Sign In / Register at the very top
-            Container(
-              height: 50,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade200,
-                borderRadius: BorderRadius.circular(25),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: toggleMode,
-                      child: Container(
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          color: !isRegister ? primaryColor : Colors.transparent,
-                          borderRadius: BorderRadius.circular(25),
-                        ),
-                        child: Text(
-                          'Log In',
-                          style: TextStyle(
-                            color: !isRegister ? Colors.white : Colors.grey.shade700,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Expanded(
-                    child: Container(
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: isRegister ? primaryColor : Colors.transparent,
-                        borderRadius: BorderRadius.circular(25),
-                      ),
-                      child: Text(
-                        'Register',
-                        style: TextStyle(
-                          color: isRegister ? Colors.white : Colors.grey.shade700,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 30),
-
-            // Title and subtitle
-            const Text(
-              "Create Account",
-              style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            const Text(
-              "Fill in the details to continue",
-              style: TextStyle(color: Colors.grey),
-            ),
-            const SizedBox(height: 30),
+            const Text('Register', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 24),
 
             // Full Name
-            const Text("Full Name", style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            _field(fullNameController, "Your full name"),
-
-            const SizedBox(height: 16),
-
-            // Email
-            const Text("Email", style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            _field(emailController, "name@example.com"),
-
+            TextField(
+              controller: fullNameController,
+              decoration: InputDecoration(
+                hintText: 'Full Name',
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            if (fullNameError.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(fullNameError, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ),
             const SizedBox(height: 16),
 
             // Phone
-            const Text("Phone Number", style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            _field(phoneController, "+123 456 7890"),
+            TextField(
+              controller: phoneController,
+              keyboardType: TextInputType.phone,
+              decoration: InputDecoration(
+                hintText: '09........',
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            if (phoneError.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(phoneError, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ),
+            const SizedBox(height: 16),
 
+            // Email
+            TextField(
+              controller: emailController,
+              decoration: InputDecoration(
+                hintText: 'name@example.com',
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+              ),
+            ),
+            if (emailError.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(emailError, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ),
             const SizedBox(height: 16),
 
             // Password
-            const Text("Password", style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            _field(passwordController, "Enter password", obscure: true, toggle: true, visible: passwordVisible, onToggle: () {
-              setState(() {
-                passwordVisible = !passwordVisible;
-              });
-            }),
-
+            TextField(
+              controller: passwordController,
+              obscureText: _obscurePassword,
+              decoration: InputDecoration(
+                hintText: '••••••••',
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                ),
+              ),
+            ),
+            if (passwordError.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(passwordError, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ),
             const SizedBox(height: 16),
 
             // Confirm Password
-            const Text("Confirm Password", style: TextStyle(fontWeight: FontWeight.w600)),
-            const SizedBox(height: 8),
-            _field(confirmController, "Confirm password", obscure: true, toggle: true, visible: confirmVisible, onToggle: () {
-              setState(() {
-                confirmVisible = !confirmVisible;
-              });
-            }),
+            TextField(
+              controller: confirmController,
+              obscureText: _obscureConfirm,
+              decoration: InputDecoration(
+                hintText: 'Confirm Password',
+                filled: true,
+                fillColor: Colors.grey.shade100,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                suffixIcon: IconButton(
+                  icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                ),
+              ),
+            ),
+            if (confirmError.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(confirmError, style: const TextStyle(color: Colors.red, fontSize: 12)),
+              ),
+            const SizedBox(height: 16),
 
-            const SizedBox(height: 30),
+            // Firebase error
+            if (firebaseError.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Text(firebaseError, style: const TextStyle(color: Colors.red)),
+              ),
 
             // Register button
             SizedBox(
               width: double.infinity,
-              height: 55,
+              height: 50,
               child: ElevatedButton(
-                onPressed: () {},
+                onPressed: _isLoading ? null : _register,
                 style: ElevatedButton.styleFrom(
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30)),
                   backgroundColor: primaryColor,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25)),
                 ),
-                child: const Text("Register"),
+                child: _isLoading
+                    ? const CircularProgressIndicator(color: Colors.white)
+                    : const Text('Create Account', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
-            ),
-
-            const SizedBox(height: 25),
-
-            // OR divider
-            Row(
-              children: const [
-                Expanded(child: Divider()),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 10),
-                  child: Text("OR CONTINUE WITH"),
-                ),
-                Expanded(child: Divider()),
-              ],
-            ),
-
-            const SizedBox(height: 25),
-
-            // Social login buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: Image.asset('assets/icons/apple.png', height: 20, width: 20),
-                    label: const Text('Apple', style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.grey.shade300),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () {},
-                    icon: Image.asset('assets/icons/google.png', height: 20, width: 20),
-                    label: const Text('Google', style: TextStyle(fontWeight: FontWeight.bold)),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: Colors.grey.shade300),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-
-            const SizedBox(height: 24),
-
-            // Bottom secure text
-            Column(
-              children: const [
-                Text(
-                  '256-BIT SECURE CONNECTION',
-                  style: TextStyle(
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                SizedBox(height: 6),
-                Text('Terms of Service • Privacy Policy',
-                    style: TextStyle(color: Colors.grey, fontSize: 12)),
-              ],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  TextField _field(TextEditingController controller, String hint,
-      {bool obscure = false, bool toggle = false, bool visible = false, VoidCallback? onToggle}) {
-    return TextField(
-      controller: controller,
-      obscureText: toggle ? !visible : obscure,
-      decoration: InputDecoration(
-        hintText: hint,
-        filled: true,
-        fillColor: Colors.grey.shade100,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(30),
-          borderSide: BorderSide.none,
-        ),
-        suffixIcon: toggle
-            ? IconButton(
-                icon: Icon(visible ? Icons.visibility : Icons.visibility_off, color: Colors.grey.shade400),
-                onPressed: onToggle,
-              )
-            : null,
       ),
     );
   }

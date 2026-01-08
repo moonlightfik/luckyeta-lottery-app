@@ -1,3 +1,17 @@
+// Add this at the very top of android/build.gradle.kts
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.2.1") // your Android Gradle version
+        classpath("com.google.gms:google-services:4.4.0")  // <-- Firebase plugin
+        classpath(kotlin("gradle-plugin", version = "1.9.10"))
+    }
+}
+
+// Keep your current allprojects, subprojects, and clean tasks
 allprojects {
     repositories {
         google()

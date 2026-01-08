@@ -1,26 +1,33 @@
 import 'package:flutter/material.dart';
 
 class AuthProviders extends StatelessWidget {
-  const AuthProviders({super.key});
+  final VoidCallback onAppleTap;
+  final VoidCallback onGoogleTap;
+  
+  const AuthProviders({
+    super.key, 
+    required this.onAppleTap, 
+    required this.onGoogleTap
+  });
 
   @override
   Widget build(BuildContext context) {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: const [
+      children: [
         _AuthButton(
           iconPath: "assets/icons/google.png",
           label: "Google",
           color: Colors.white,
           textColor: Colors.black87,
-          provider: "Google",
+          onTap: onGoogleTap, 
         ),
         _AuthButton(
           iconPath: "assets/icons/apple.png",
           label: "Apple",
-          color: Colors.black,
-          textColor: Colors.white,
-          provider: "Apple",
+          color: Colors.white,
+          textColor: Colors.black,
+          onTap: onAppleTap, 
         ),
       ],
     );
@@ -32,26 +39,21 @@ class _AuthButton extends StatelessWidget {
   final String label;
   final Color color;
   final Color textColor;
-  final String provider;
+  final VoidCallback onTap; // Callback parameter
 
   const _AuthButton({
     required this.iconPath,
     required this.label,
     required this.color,
     required this.textColor,
-    required this.provider,
+    required this.onTap, // Required parameter
   });
 
   @override
   Widget build(BuildContext context) {
     return Expanded(
       child: GestureDetector(
-        onTap: () {
-          debugPrint("$provider sign-in tapped");
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text("$provider sign-in tapped")),
-          );
-        },
+        onTap: onTap, // Using the passed callback
         child: Container(
           height: 50,
           margin: const EdgeInsets.symmetric(horizontal: 8),
@@ -69,6 +71,7 @@ class _AuthButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              
               Image.asset(
                 iconPath,
                 height: 24,
