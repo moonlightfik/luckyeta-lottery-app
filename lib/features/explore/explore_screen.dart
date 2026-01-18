@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../models/lottery_model.dart';
+import '../buy_ticket/buy_ticket_screen.dart';
+import '../../navigation/bottom_nav_screen.dart';
 
 class ExploreScreen extends StatefulWidget {
   final String userName;
@@ -13,6 +17,13 @@ class _ExploreScreenState extends State<ExploreScreen> {
   int _selectedCategory = 0;
   Duration _countdown = const Duration(hours: 4, minutes: 22, seconds: 10);
   late Timer _timer;
+
+  final List<String> categories = [
+    'All Games',
+    'High Prizes',
+    'Daily Draw',
+    'Exclusive',
+  ];
 
   @override
   void initState() {
@@ -36,52 +47,25 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
   String formatDuration(Duration d) {
     String twoDigits(int n) => n.toString().padLeft(2, '0');
-    final h = twoDigits(d.inHours.remainder(60));
-    final m = twoDigits(d.inMinutes.remainder(60));
-    final s = twoDigits(d.inSeconds.remainder(60));
-    return "$h:$m:$s";
+    return "${twoDigits(d.inHours)}:${twoDigits(d.inMinutes.remainder(60))}:${twoDigits(d.inSeconds.remainder(60))}";
   }
-
-  final List<String> categories = [
-    'All Games',
-    'High Prizes',
-    'Daily Draw',
-    'Exclusive'
-  ];
-
-  final List<Map<String, String>> trending = [
-    {'title': 'Daily Green', 'next': '5:00 PM', 'prize': '\$50,000', 'icon': '🌿'},
-    {'title': 'Power Bolt', 'next': 'Tomorrow', 'prize': '\$150,000', 'icon': '⚡'},
-    {'title': 'Diamond Dream', 'next': 'Friday', 'prize': '\$2,000,000', 'icon': '💎'},
-    {'title': 'Ocean Splash', 'next': '2h 15m', 'prize': '\$7,500', 'icon': '💧'},
-  ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Welcome + avatar
+              // Header
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text.rich(
-                    TextSpan(
-                      text: 'Welcome back,\n',
-                      style: const TextStyle(fontSize: 14, color: Colors.grey),
-                      children: [
-                        TextSpan(
-                          text: 'Explore Lotteries',
-                          style: const TextStyle(
-                              fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
-                        ),
-                      ],
-                    ),
+                children: const [
+                  Text(
+                    'Explore Lotteries',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
                   ),
                   CircleAvatar(
                     radius: 25,
@@ -89,67 +73,47 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 16),
 
-              // Search bar
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Search for lotteries...',
-                        filled: true,
-                        fillColor: Colors.grey.shade200,
-                        prefixIcon: const Icon(Icons.search),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 0),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(16),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
+              // Search
+              TextField(
+                decoration: InputDecoration(
+                  hintText: 'Search for lotteries...',
+                  filled: true,
+                  fillColor: Colors.grey.shade200,
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    borderSide: BorderSide.none,
                   ),
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(Icons.filter_list),
-                  )
-                ],
+                ),
               ),
+
               const SizedBox(height: 16),
 
-              // Categories tabs
+              // Categories
               SizedBox(
                 height: 40,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   itemCount: categories.length,
                   itemBuilder: (_, index) {
-                    final selected = index == _selectedCategory;
+                    final selected = _selectedCategory == index;
                     return GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedCategory = index;
-                        });
-                      },
+                      onTap: () => setState(() => _selectedCategory = index),
                       child: Container(
                         margin: const EdgeInsets.only(right: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
                         decoration: BoxDecoration(
                           color: selected ? Colors.green : Colors.grey.shade200,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Center(
-                          child: Text(
-                            categories[index],
-                            style: TextStyle(
-                              color: selected ? Colors.white : Colors.black,
-                              fontWeight: FontWeight.w500,
-                            ),
+                        alignment: Alignment.center,
+                        child: Text(
+                          categories[index],
+                          style: TextStyle(
+                            color: selected ? Colors.white : Colors.black,
                           ),
                         ),
                       ),
@@ -157,111 +121,104 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: 16),
 
-              // Featured Jackpot
+              const SizedBox(height: 20),
+
+              // Featured Jackpots
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    'Featured Jackpot',
+                    'Featured Jackpots',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   TextButton(
-                    onPressed: () {},
-                    child: const Text('See All', style: TextStyle(color: Colors.green)),
-                  )
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) =>
+                              const BottomNavScreen(initialIndex: 1),
+                        ),
+                      );
+                    },
+                    child: const Text('View All',
+                        style: TextStyle(color: Colors.green)),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: Colors.green.shade900,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.red.shade400,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        'Ends in ${formatDuration(_countdown)}',
-                        style: const TextStyle(color: Colors.white),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    const Text('Mega Gold Rush',
-                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
-                    const SizedBox(height: 4),
-                    const Text('Grand Monthly Draw', style: TextStyle(color: Colors.white70)),
-                    const SizedBox(height: 12),
-                    const Text('CURRENT PRIZE', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                    const SizedBox(height: 4),
-                    const Text('\$5,000,000',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.yellow)),
-                    const SizedBox(height: 12),
-                    ElevatedButton(
-                      onPressed: () {},
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                      ),
-                      child: const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Center(child: Text('Play Now')),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
 
-              // Trending Now
-              const Text('Trending Now', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 12),
-              Column(
-                children: trending.map((game) {
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Row(
-                      children: [
-                        CircleAvatar(
-                          radius: 25,
-                          backgroundColor: Colors.white,
-                          child: Text(game['icon']!, style: const TextStyle(fontSize: 20)),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(game['title']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 2),
-                              Text('Next: ${game['next']}', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                              const SizedBox(height: 2),
-                              Text(game['prize']!, style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.yellow)),
-                            ],
+
+              SizedBox(
+                height: 180,
+                child: StreamBuilder<QuerySnapshot>(
+                  stream: FirebaseFirestore.instance
+                      .collection('lotteries')
+                      .snapshots(),
+                  builder: (context, snapshot) {
+                    if (!snapshot.hasData) {
+                      return const Center(
+                          child: CircularProgressIndicator());
+                    }
+
+                    final lotteries = snapshot.data!.docs
+                        .map(
+                          (doc) => Lottery.fromFirestore(
+                            doc.id,
+                            doc.data() as Map<String, dynamic>,
                           ),
-                        ),
-                        IconButton(
-                          onPressed: () {},
-                          icon: const Icon(Icons.add, color: Colors.green),
                         )
-                      ],
-                    ),
-                  );
-                }).toList(),
+                        .toList();
+
+                    return ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: lotteries.length,
+                      itemBuilder: (context, index) {
+                        final lottery = lotteries[index];
+                        return GestureDetector(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    BuyTicketScreen(lottery: lottery),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            width: 250,
+                            margin: const EdgeInsets.only(right: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade300,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  lottery.title,
+                                  style: const TextStyle(
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Prize: \$${lottery.jackpot}',
+                                  style: const TextStyle(
+                                      color: Colors.green,
+                                      fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
               ),
             ],
           ),

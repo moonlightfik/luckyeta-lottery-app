@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'firebase_options.dart'; // <-- use the generated file
+import 'firebase_options.dart'; 
 
 import 'features/splash/splash_screen.dart';
 
@@ -30,7 +30,7 @@ class LuckyEtaApp extends StatelessWidget {
         primarySwatch: Colors.blue,
         scaffoldBackgroundColor: Colors.white,
       ),
-      home: const SplashScreen(), // Start with your splash screen
+      home: const SplashScreen(), // Start with  splash screen
     );
   }
 }

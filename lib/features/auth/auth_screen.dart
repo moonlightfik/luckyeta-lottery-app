@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'widgets/auth_providers.dart';
 import '../../navigation/bottom_nav_screen.dart';
 
@@ -16,7 +18,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _obscureConfirm = true;
   bool isLoading = false;
 
-  final _auth = FirebaseAuth.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
 
   // Controllers
   final TextEditingController fullNameController = TextEditingController();
@@ -54,40 +56,36 @@ class _AuthScreenState extends State<AuthScreen> {
       passwordError = '';
       confirmPasswordError = '';
 
-      // Full Name (register)
       if (!isSignIn && fullNameController.text.isEmpty) {
         fullNameError = '* Full Name required';
         valid = false;
       }
 
-      // Phone (register)
       if (!isSignIn) {
         if (phoneController.text.isEmpty) {
           phoneError = '* Phone required';
           valid = false;
-        } else if (!RegExp(r'^(09|07)\d{8}$').hasMatch(phoneController.text)) {
+        } else if (!RegExp(r'^(09|07)\d{8}$')
+            .hasMatch(phoneController.text)) {
           phoneError = '* Phone must start with 09 or 07 and be 10 digits';
           valid = false;
         }
       }
 
-      // Email
       if (emailController.text.isEmpty) {
         emailError = '* Email required';
         valid = false;
       } else if (!emailController.text.contains('@') ||
-          !emailController.text.contains('.com')) {
+          !emailController.text.contains('.')) {
         emailError = '* Invalid email address';
         valid = false;
       }
 
-      // Password
       if (passwordController.text.isEmpty) {
         passwordError = '* Password required';
         valid = false;
       }
 
-      // Confirm password (register)
       if (!isSignIn) {
         if (confirmPasswordController.text.isEmpty) {
           confirmPasswordError = '* Confirm password required';
@@ -109,57 +107,65 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() => isLoading = true);
 
     try {
+      UserCredential userCredential;
+
       if (isSignIn) {
-        // Log in
-        await _auth.signInWithEmailAndPassword(
+        // LOGIN
+        userCredential = await _auth.signInWithEmailAndPassword(
           email: emailController.text.trim(),
           password: passwordController.text.trim(),
-        );
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login successful')),
         );
       } else {
-        // Register
-        await _auth.createUserWithEmailAndPassword(
+        // REGISTER
+        userCredential = await _auth.createUserWithEmailAndPassword(
           email: emailController.text.trim(),
           password: passwordController.text.trim(),
         );
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account created successfully')),
-        );
+        // Update display name
+        await userCredential.user!
+            .updateDisplayName(fullNameController.text.trim());
+
+        // Create Firestore user
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set({
+          'username': fullNameController.text.trim(),
+          'email': emailController.text.trim(),
+          'phone': phoneController.text.trim(),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
 
-      // ✅ Navigate to BottomNavScreen after login/register
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const BottomNavScreen()),
+          MaterialPageRoute(
+            builder: (_) => const BottomNavScreen(initialIndex: 0),
+          ),
         );
       }
-
     } on FirebaseAuthException catch (e) {
-      String message = '';
-      if (e.code == 'user-not-found') {
-        message = 'Account does not exist';
-      } else if (e.code == 'wrong-password') {
-        message = 'Wrong password';
-      } else if (e.code == 'email-already-in-use') {
-        message = 'Email already in use';
-      } else {
-        message = 'Authentication failed: ${e.message}';
+      String message;
+      switch (e.code) {
+        case 'user-not-found':
+          message = 'Account does not exist';
+          break;
+        case 'wrong-password':
+          message = 'Wrong password';
+          break;
+        case 'email-already-in-use':
+          message = 'Email already in use';
+          break;
+        default:
+          message = e.message ?? 'Authentication failed';
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error: $e')),
-      );
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(message)));
     } finally {
-      setState(() => isLoading = false);
+      if (mounted) setState(() => isLoading = false);
     }
   }
 
@@ -170,269 +176,237 @@ class _AuthScreenState extends State<AuthScreen> {
     return Scaffold(
       backgroundColor: Colors.white,
       body: SingleChildScrollView(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Toggle Sign In / Register
-              Container(
-                height: 50,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          if (!isSignIn) toggleMode();
-                        },
-                        child: Container(
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: isSignIn ? primaryColor : Colors.transparent,
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          child: Text(
-                            'Log In',
-                            style: TextStyle(
-                              color: isSignIn ? Colors.white : Colors.grey.shade700,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: GestureDetector(
-                        onTap: () {
-                          if (isSignIn) toggleMode();
-                        },
-                        child: Container(
-                          alignment: Alignment.center,
-                          decoration: BoxDecoration(
-                            color: !isSignIn ? primaryColor : Colors.transparent,
-                            borderRadius: BorderRadius.circular(25),
-                          ),
-                          child: Text(
-                            'Register',
-                            style: TextStyle(
-                              color: !isSignIn ? Colors.white : Colors.grey.shade700,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // Toggle
+            Container(
+              height: 50,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(25),
               ),
-
-              const SizedBox(height: 24),
-
-              // Full Name (register)
-              if (!isSignIn)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Full Name', style: TextStyle(fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: fullNameController,
-                      decoration: InputDecoration(
-                        hintText: 'full name',
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    if (fullNameError.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: Text(
-                          fullNameError,
-                          style: const TextStyle(color: Colors.red, fontSize: 12),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-
-              // Phone (register)
-              if (!isSignIn)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Phone', style: TextStyle(fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: phoneController,
-                      keyboardType: TextInputType.phone,
-                      decoration: InputDecoration(
-                        hintText: '09........',
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    if (phoneError.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: Text(
-                          phoneError,
-                          style: const TextStyle(color: Colors.red, fontSize: 12),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-
-              // Email field
-              const Text('Email Address', style: TextStyle(fontWeight: FontWeight.w500)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: emailController,
-                decoration: InputDecoration(
-                  hintText: 'name@example.com',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                ),
-              ),
-              if (emailError.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4.0),
-                  child: Text(
-                    emailError,
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
-                  ),
-                ),
-              const SizedBox(height: 16),
-
-              // Password field
-              const Text('Password', style: TextStyle(fontWeight: FontWeight.w500)),
-              const SizedBox(height: 8),
-              TextField(
-                controller: passwordController,
-                obscureText: _obscurePassword,
-                decoration: InputDecoration(
-                  hintText: '••••••••',
-                  filled: true,
-                  fillColor: Colors.grey.shade100,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                    borderSide: BorderSide.none,
-                  ),
-                  suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                    onPressed: () {
-                      setState(() {
-                        _obscurePassword = !_obscurePassword;
-                      });
-                    },
-                  ),
-                ),
-              ),
-              if (passwordError.isNotEmpty)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4.0),
-                  child: Text(
-                    passwordError,
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
-                  ),
-                ),
-              const SizedBox(height: 16),
-
-              // Confirm password (register)
-              if (!isSignIn)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Confirm Password', style: TextStyle(fontWeight: FontWeight.w500)),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: confirmPasswordController,
-                      obscureText: _obscureConfirm,
-                      decoration: InputDecoration(
-                        hintText: '••••••••',
-                        filled: true,
-                        fillColor: Colors.grey.shade100,
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide.none,
-                        ),
-                        suffixIcon: IconButton(
-                          icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
-                          onPressed: () {
-                            setState(() {
-                              _obscureConfirm = !_obscureConfirm;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                    if (confirmPasswordError.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 4.0),
-                        child: Text(
-                          confirmPasswordError,
-                          style: const TextStyle(color: Colors.red, fontSize: 12),
-                        ),
-                      ),
-                    const SizedBox(height: 16),
-                  ],
-                ),
-
-              // Enter button
-              ElevatedButton(
-                onPressed: isLoading ? null : _submit,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: primaryColor,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(25),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                ),
-                child: Text(
-                  isSignIn ? 'Enter LuckyEta' : 'Create Account',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // OR Continue with
-              Row(
+              child: Row(
                 children: [
-                  Expanded(child: Divider(color: Colors.grey.shade400)),
-                  const Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 8.0),
-                    child: Text('OR CONTINUE WITH', style: TextStyle(color: Colors.grey)),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        if (!isSignIn) toggleMode();
+                      },
+                      child: Container(
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color:
+                              isSignIn ? primaryColor : Colors.transparent,
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: Text(
+                          'Log In',
+                          style: TextStyle(
+                            color: isSignIn
+                                ? Colors.white
+                                : Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
                   ),
-                  Expanded(child: Divider(color: Colors.grey.shade400)),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        if (isSignIn) toggleMode();
+                      },
+                      child: Container(
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color:
+                              !isSignIn ? primaryColor : Colors.transparent,
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        child: Text(
+                          'Register',
+                          style: TextStyle(
+                            color: !isSignIn
+                                ? Colors.white
+                                : Colors.grey.shade700,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 16),
+            ),
 
-              // Social buttons
-              AuthProviders(
-                onGoogleTap: () {}, // empty for now
-                onAppleTap: () {},  //  empty for now
+            const SizedBox(height: 24),
+
+            // Full Name
+            if (!isSignIn)
+              _inputBlock(
+                label: 'Full Name',
+                controller: fullNameController,
+                error: fullNameError,
+                hint: 'full name',
               ),
-            ],
-          ),
+
+            // Phone
+            if (!isSignIn)
+              _inputBlock(
+                label: 'Phone',
+                controller: phoneController,
+                error: phoneError,
+                hint: '09........',
+                keyboard: TextInputType.phone,
+              ),
+
+            // Email
+            _inputBlock(
+              label: 'Email Address',
+              controller: emailController,
+              error: emailError,
+              hint: 'name@example.com',
+            ),
+
+            // Password
+            _passwordBlock(
+              label: 'Password',
+              controller: passwordController,
+              error: passwordError,
+              obscure: _obscurePassword,
+              toggle: () =>
+                  setState(() => _obscurePassword = !_obscurePassword),
+            ),
+
+            // Confirm Password
+            if (!isSignIn)
+              _passwordBlock(
+                label: 'Confirm Password',
+                controller: confirmPasswordController,
+                error: confirmPasswordError,
+                obscure: _obscureConfirm,
+                toggle: () =>
+                    setState(() => _obscureConfirm = !_obscureConfirm),
+              ),
+
+            ElevatedButton(
+              onPressed: isLoading ? null : _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: primaryColor,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(25),
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+              child: Text(
+                isSignIn ? 'Enter LuckyEta' : 'Create Account',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            Row(
+              children: [
+                Expanded(child: Divider(color: Colors.grey.shade400)),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('OR CONTINUE WITH',
+                      style: TextStyle(color: Colors.grey)),
+                ),
+                Expanded(child: Divider(color: Colors.grey.shade400)),
+              ],
+            ),
+
+            const SizedBox(height: 16),
+
+            AuthProviders(
+              onGoogleTap: () {},
+              onAppleTap: () {},
+            ),
+          ],
         ),
       ),
+    );
+  }
+
+  Widget _inputBlock({
+    required String label,
+    required TextEditingController controller,
+    required String error,
+    required String hint,
+    TextInputType keyboard = TextInputType.text,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          keyboardType: keyboard,
+          decoration: InputDecoration(
+            hintText: hint,
+            filled: true,
+            fillColor: Colors.grey.shade100,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+        if (error.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child:
+                Text(error, style: const TextStyle(color: Colors.red, fontSize: 12)),
+          ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _passwordBlock({
+    required String label,
+    required TextEditingController controller,
+    required String error,
+    required bool obscure,
+    required VoidCallback toggle,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontWeight: FontWeight.w500)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: controller,
+          obscureText: obscure,
+          decoration: InputDecoration(
+            hintText: '••••••••',
+            filled: true,
+            fillColor: Colors.grey.shade100,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+            suffixIcon: IconButton(
+              icon:
+                  Icon(obscure ? Icons.visibility_off : Icons.visibility),
+              onPressed: toggle,
+            ),
+          ),
+        ),
+        if (error.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child:
+                Text(error, style: const TextStyle(color: Colors.red, fontSize: 12)),
+          ),
+        const SizedBox(height: 16),
+      ],
     );
   }
 }
