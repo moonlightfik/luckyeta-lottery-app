@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 import '../features/home/home_screen.dart';
 import '../features/explore/explore_screen.dart';
 import '../features/my_lotteries/my_lotteries_screen.dart';
@@ -32,13 +33,7 @@ class _BottomNavScreenState extends State<BottomNavScreen> {
       const HomeScreen(),
       ExploreScreen(userName: username),
       const MyLotteriesScreen(),
-      ProfilePage(
-        userName: username,
-        luckLevel: 'Beginner',
-        activeTickets: 0,
-        lotteriesCreated: 0,
-        totalWinnings: 0.0,
-      ),
+      const ProfilePage(), // ✅ FIXED
     ];
 
     return Scaffold(

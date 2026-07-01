@@ -203,7 +203,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           drawFrequency:
                               data['drawFrequency'] ?? 'Daily',
 
-                          // ✅ NULL-SAFE FIX (ONLY CHANGE)
+                          // null safe fix 
                           nextDrawAt:
                               (data['nextDrawAt'] as Timestamp?)
                                       ?.toDate() ??
