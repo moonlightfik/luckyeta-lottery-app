@@ -1,27 +1,99 @@
-import 'package:flutter/material.dart';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
+
+import 'widgets/card_style_selector.dart';
+import 'widgets/category_selector.dart';
+import 'widgets/cover_image_picker.dart';
+import 'widgets/theme_selector.dart';
 
 class CreateLotteryScreen extends StatefulWidget {
   const CreateLotteryScreen({super.key});
 
   @override
-  State<CreateLotteryScreen> createState() => _CreateLotteryScreenState();
+  State<CreateLotteryScreen> createState() =>
+      _CreateLotteryScreenState();
 }
 
-class _CreateLotteryScreenState extends State<CreateLotteryScreen> {
-  final TextEditingController titleController = TextEditingController();
-  final TextEditingController jackpotController = TextEditingController();
+class _CreateLotteryScreenState
+    extends State<CreateLotteryScreen> {
+  //-----------------------------------------
+  // CONTROLLERS
+  //-----------------------------------------
+
+  final titleController = TextEditingController();
+
+  final descriptionController =
+      TextEditingController();
+
+  final jackpotController =
+      TextEditingController();
+
+  final totalTicketsController =
+      TextEditingController(text: "100");
+
+  final maxTicketsController =
+      TextEditingController(text: "5");
+
+  //-----------------------------------------
+  // IMAGE
+  //-----------------------------------------
+
+  File? coverImage;
+
+  //-----------------------------------------
+  // THEME
+  //-----------------------------------------
+
+  Color selectedTheme =
+      const Color(0xff16A34A);
+
+  //-----------------------------------------
+  // STYLE
+  //-----------------------------------------
+
+  String selectedStyle = "Modern";
+
+  //-----------------------------------------
+  // CATEGORY
+  //-----------------------------------------
+
+  String selectedCategory = "Cash";
+
+  //-----------------------------------------
+  // LOTTERY
+  //-----------------------------------------
 
   double pricePerTicket = 5;
+
   int totalTickets = 100;
+
   bool limitPerUser = true;
+
   int maxTicketsPerUser = 5;
 
-  String drawFrequency = 'Daily';
+  int numberOfWinners = 1;
+
+  //-----------------------------------------
+  // TYPE
+  //-----------------------------------------
+
+  String lotteryType = "recurring";
+
+  String drawFrequency = "Daily";
+
+  DateTime nextDrawAt =
+      DateTime.now();
+
+  //-----------------------------------------
+  // VISIBILITY
+  //-----------------------------------------
+
   bool isPublic = true;
 
-  DateTime nextDrawAt = DateTime.now();
+  //-----------------------------------------
 
   @override
   void initState() {
@@ -29,337 +101,1011 @@ class _CreateLotteryScreenState extends State<CreateLotteryScreen> {
     calculateNextDraw();
   }
 
+  //-----------------------------------------
+
   void calculateNextDraw() {
     final now = DateTime.now();
 
-    switch (drawFrequency) {
-      case 'Hourly':
-        nextDrawAt = now.add(const Duration(hours: 1));
-        break;
-      case 'Daily':
-        nextDrawAt = DateTime(now.year, now.month, now.day + 1, 20, 0);
-        break;
-      case 'Weekly':
-        int daysToFriday = (5 - now.weekday) % 7;
-        nextDrawAt = DateTime(now.year, now.month, now.day + daysToFriday, 20, 0);
-        break;
+    if (lotteryType == "oneTime") {
+      nextDrawAt =
+          now.add(const Duration(days: 1));
+    } else {
+      switch (drawFrequency) {
+        case "Hourly":
+          nextDrawAt =
+              now.add(const Duration(hours: 1));
+          break;
+
+        case "Daily":
+          nextDrawAt = DateTime(
+            now.year,
+            now.month,
+            now.day + 1,
+            20,
+          );
+          break;
+
+        case "Weekly":
+          final days =
+              (5 - now.weekday) % 7;
+
+          nextDrawAt = DateTime(
+            now.year,
+            now.month,
+            now.day + days,
+            20,
+          );
+
+          break;
+      }
     }
+
     setState(() {});
   }
 
-  String get formattedDrawTime {
-    return "${nextDrawAt.day.toString().padLeft(2, '0')}/"
-        "${nextDrawAt.month.toString().padLeft(2, '0')}/"
-        "${nextDrawAt.year} "
-        "${nextDrawAt.hour.toString().padLeft(2, '0')}:"
-        "${nextDrawAt.minute.toString().padLeft(2, '0')}";
+  //-----------------------------------------
+
+  double get jackpot {
+    return double.tryParse(
+            jackpotController.text) ??
+        0;
   }
 
+  //-----------------------------------------
+
+  double get revenue {
+    return pricePerTicket *
+        totalTickets;
+  }
+
+  //-----------------------------------------
+
+  double get fee {
+    return revenue * .02;
+  }
+
+  //-----------------------------------------
+
+  double get creatorProfit {
+    return revenue -
+        jackpot -
+        fee;
+  }
+
+  //-----------------------------------------
+
   Future<void> launchLottery() async {
-    if (titleController.text.isEmpty || jackpotController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter title and jackpot")),
-      );
+    if (titleController.text.isEmpty ||
+        jackpotController.text.isEmpty) {
       return;
     }
 
-    try {
-      await FirebaseFirestore.instance.collection('lotteries').add({
-        'title': titleController.text.trim(),
-        'jackpot': double.parse(jackpotController.text),
-        'pricePerTicket': pricePerTicket,
-        'totalTickets': totalTickets,
-        'maxTicketsPerUser': limitPerUser ? maxTicketsPerUser : null,
-        'drawFrequency': drawFrequency,
-        'nextDrawAt': Timestamp.fromDate(nextDrawAt),
-        'isPublic': isPublic,
-        'creatorId': FirebaseAuth.instance.currentUser!.uid,
-        'status': 'ACTIVE',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
+    // Firebase Storage upload
+    // will be added later
 
-      final createNew = await showDialog<bool>(
-        context: context,
-        builder: (_) => AlertDialog(
-          title: const Text("Lottery Launched!"),
-          content: const Text("Do you want to create a new lottery?"),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text("No"),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text("Yes"),
-            ),
-          ],
-        ),
-      );
+    String? imageUrl;
 
-      if (createNew == true) {
-        titleController.clear();
-        jackpotController.clear();
-        pricePerTicket = 5;
-        totalTickets = 100;
-        maxTicketsPerUser = 5;
-        limitPerUser = true;
-        drawFrequency = 'Daily';
-        isPublic = true;
-        calculateNextDraw();
-      } else {
-        Navigator.pop(context);
-      }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Failed to launch lottery: $e")),
-      );
-    }
+    await FirebaseFirestore.instance
+        .collection("lotteries")
+        .add({
+      "title":
+          titleController.text.trim(),
+
+      "description":
+          descriptionController.text.trim(),
+
+      "category":
+          selectedCategory,
+
+      "themeColor":
+          selectedTheme.value,
+
+      "cardStyle":
+          selectedStyle,
+
+      "imageUrl":
+          imageUrl,
+
+      "jackpot": jackpot,
+
+      "pricePerTicket":
+          pricePerTicket,
+
+      "totalTickets":
+          totalTickets,
+
+      "maxTicketsPerUser":
+          limitPerUser
+              ? maxTicketsPerUser
+              : null,
+
+      "numberOfWinners":
+          numberOfWinners,
+
+      "lotteryType":
+          lotteryType,
+
+      "drawFrequency":
+          lotteryType ==
+                  "recurring"
+              ? drawFrequency
+              : null,
+
+      "nextDrawAt":
+          Timestamp.fromDate(
+              nextDrawAt),
+
+      "isPublic":
+          isPublic,
+
+      "creatorId":
+          FirebaseAuth.instance
+              .currentUser!
+              .uid,
+
+      "status": "ACTIVE",
+
+      "createdAt":
+          FieldValue.serverTimestamp(),
+    });
+
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+        .showSnackBar(
+      const SnackBar(
+        content:
+            Text("Lottery Created 🎉"),
+      ),
+    );
+
+    Navigator.pop(context);
   }
+
+  //-----------------------------------------
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Back button and title
-              Row(
-                children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.arrow_back),
-                  ),
-                  const SizedBox(width: 16),
-                  const Text(
-                    'New Lottery',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+      backgroundColor:
+          const Color(0xffF7F8FA),
 
-              // Title
-              const Text(
-                "LOTTERY NAME",
-                style: TextStyle(color: Colors.green),
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        centerTitle: true,
+        title: const Text(
+          "Create Lottery",
+          style: TextStyle(
+            color: Colors.black,
+            fontWeight:
+                FontWeight.bold,
+          ),
+        ),
+      ),
+
+      body: SingleChildScrollView(
+        padding:
+            const EdgeInsets.all(20),
+
+        child: Column(
+          crossAxisAlignment:
+              CrossAxisAlignment.start,
+
+          children: [
+
+            //---------------------------------------------------
+            // COVER IMAGE
+            //---------------------------------------------------
+
+            CoverImagePicker(
+              onImageSelected: (file) {
+                coverImage = file;
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            //---------------------------------------------------
+            // THEME
+            //---------------------------------------------------
+
+            ThemeSelector(
+              selectedColor:
+                  selectedTheme,
+              onChanged: (color) {
+                setState(() {
+                  selectedTheme =
+                      color;
+                });
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            //---------------------------------------------------
+            // STYLE
+            //---------------------------------------------------
+
+            CardStyleSelector(
+              selectedStyle:
+                  selectedStyle,
+              onChanged: (style) {
+                setState(() {
+                  selectedStyle =
+                      style;
+                });
+              },
+            ),
+
+            const SizedBox(height: 24),
+
+            //---------------------------------------------------
+            // CATEGORY
+            //---------------------------------------------------
+
+            CategorySelector(
+              selectedCategory:
+                  selectedCategory,
+              onChanged:
+                  (category) {
+                setState(() {
+                  selectedCategory =
+                      category;
+                });
+              },
+            ),
+
+            const SizedBox(height: 30),
+                        //---------------------------------------------------
+            // LOTTERY DETAILS
+            //---------------------------------------------------
+
+            const Text(
+              "Lottery Details",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
               ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: titleController,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  hintText: "Enter lottery name",
+            ),
+
+            const SizedBox(height: 18),
+
+            TextField(
+              controller: titleController,
+              decoration: InputDecoration(
+                labelText: "Lottery Name",
+                hintText: "Summer Jackpot",
+                prefixIcon: const Icon(Icons.emoji_events),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              const SizedBox(height: 16),
+            ),
 
-              // Total jackpot
-              const Text(
-                "TOTAL JACKPOT PRIZE",
-                style: TextStyle(color: Colors.green),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: jackpotController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  prefixText: "\$ ",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  hintText: "0.00",
+            const SizedBox(height: 18),
+
+            TextField(
+              controller: descriptionController,
+              maxLines: 4,
+              decoration: InputDecoration(
+                labelText: "Description (Optional)",
+                hintText:
+                    "Tell people what they can win...",
+                alignLabelWithHint: true,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              const SizedBox(height: 16),
+            ),
 
-              // Price per ticket
-              const Text("Price per Ticket"),
-              Slider(
-                min: 1,
-                max: 50,
-                value: pricePerTicket,
-                activeColor: Colors.green,
-                onChanged: (val) {
-                  setState(() {
-                    pricePerTicket = val;
-                  });
-                },
-                divisions: 49,
-                label: "\$${pricePerTicket.toInt()}",
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text("\$1"),
-                  Text("\$${pricePerTicket.toInt()}"),
-                  const Text("\$50"),
-                ],
-              ),
-              const SizedBox(height: 16),
+            const SizedBox(height: 18),
 
-              // Ticket supply
-              const Text("TICKET SUPPLY & LIMITS"),
-              const SizedBox(height: 8),
-              TextField(
-                controller: TextEditingController(text: "$totalTickets"),
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: "Total Tickets",
-                  suffixText: "pcs",
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12)),
+            DropdownButtonFormField<String>(
+              value: selectedCategory,
+              decoration: InputDecoration(
+                labelText: "Prize Category",
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                onChanged: (val) {
-                  setState(() {
-                    totalTickets = int.tryParse(val) ?? 0;
-                  });
-                },
               ),
-              const SizedBox(height: 8),
+              items: const [
+                DropdownMenuItem(
+                    value: "Cash",
+                    child: Text("💵 Cash")),
+                DropdownMenuItem(
+                    value: "Electronics",
+                    child: Text("📱 Electronics")),
+                DropdownMenuItem(
+                    value: "Vehicle",
+                    child: Text("🚗 Vehicle")),
+                DropdownMenuItem(
+                    value: "Property",
+                    child: Text("🏠 Property")),
+                DropdownMenuItem(
+                    value: "Travel",
+                    child: Text("✈ Travel")),
+                DropdownMenuItem(
+                    value: "Gift",
+                    child: Text("🎁 Gift")),
+                DropdownMenuItem(
+                    value: "Other",
+                    child: Text("🎟 Other")),
+              ],
+              onChanged: (value) {
+                if (value == null) return;
+                setState(() {
+                  selectedCategory = value;
+                });
+              },
+            ),
 
-              // Limit per user
-              SwitchListTile(
-                title: const Text("Limit per User"),
-                value: limitPerUser,
-                activeThumbColor: Colors.green,
-                onChanged: (val) {
-                  setState(() {
-                    limitPerUser = val;
-                  });
-                },
-              ),
-              if (limitPerUser)
-                TextField(
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(
-                    labelText: "Max Tickets per User",
-                    suffixText: "pcs",
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
-                  onChanged: (val) {
-                    setState(() {
-                      maxTicketsPerUser = int.tryParse(val) ?? 5;
-                    });
-                  },
+            const SizedBox(height: 18),
+
+            TextField(
+              controller: jackpotController,
+              keyboardType:
+                  const TextInputType.numberWithOptions(
+                      decimal: true),
+              decoration: InputDecoration(
+                labelText: "Jackpot Prize",
+                prefixText: "\$ ",
+                prefixIcon:
+                    const Icon(Icons.workspace_premium),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
-              const SizedBox(height: 16),
-
-              // Draw frequency
-              const Text("When does it draw?"),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: ['Hourly', 'Daily', 'Weekly'].map((freq) {
-                  final isSelected = drawFrequency == freq;
-                  return ChoiceChip(
-                    label: Text(freq),
-                    selected: isSelected,
-                    onSelected: (_) {
-                      setState(() {
-                        drawFrequency = freq;
-                        calculateNextDraw();
-                      });
-                    },
-                  );
-                }).toList(),
               ),
-              const SizedBox(height: 8),
-              Text("Next draw: $formattedDrawTime"),
-              const SizedBox(height: 16),
+            ),
 
-              // Public / Private buttons with icons and description
-              const Text("Who can play?"),
-              Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => isPublic = true),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: isPublic ? Colors.green.shade50 : Colors.grey.shade200,
-                          border: Border.all(
-                              color: isPublic ? Colors.green : Colors.grey),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: const [
-                            Icon(Icons.public, color: Colors.green),
-                            SizedBox(height: 4),
-                            Text("Public", style: TextStyle(fontWeight: FontWeight.bold)),
-                            Text("Anyone on LuckyLink", style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
+            const SizedBox(height: 30),
+
+            //---------------------------------------------------
+            // TICKET PRICE
+            //---------------------------------------------------
+
+            const Text(
+              "Ticket Price",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.circular(18),
+                side: BorderSide(
+                  color: Colors.grey.shade300,
+                ),
+              ),
+              child: Padding(
+                padding:
+                    const EdgeInsets.all(18),
+                child: Column(
+                  children: [
+                    Text(
+                      "\$${pricePerTicket.toStringAsFixed(0)}",
+                      style: const TextStyle(
+                        fontSize: 34,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.green,
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () => setState(() => isPublic = false),
-                      child: Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: !isPublic ? Colors.green.shade50 : Colors.grey.shade200,
-                          border: Border.all(
-                              color: !isPublic ? Colors.green : Colors.grey),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          children: const [
-                            Icon(Icons.lock, color: Colors.green),
-                            SizedBox(height: 4),
-                            Text("Private", style: TextStyle(fontWeight: FontWeight.bold)),
-                            Text("Invite link only", style: TextStyle(fontSize: 12)),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-
-              // Publishing tax
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade200,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text("Publishing Tax (2%)"),
-                    Text("\$0.00"),
+                  Slider(
+  value: pricePerTicket,
+  min: 1,
+  max: 100,
+  divisions: 99,
+  activeColor: Colors.green,
+  inactiveColor: Colors.green.shade100,
+  thumbColor: Colors.green,
+  onChanged: (value) {
+    setState(() {
+      pricePerTicket = value;
+    });
+  },
+),
                   ],
                 ),
               ),
-              const SizedBox(height: 24),
+            ),
 
-              // Launch button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: launchLottery,
-                  icon: const Icon(Icons.rocket_launch),
-                  label: const Text("Launch Lottery"),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                  ),
+            const SizedBox(height: 30),
+
+            //---------------------------------------------------
+            // TICKET SETTINGS
+            //---------------------------------------------------
+
+            const Text(
+              "Ticket Settings",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            TextField(
+              controller: totalTicketsController,
+              keyboardType: TextInputType.number,
+              decoration: InputDecoration(
+                labelText: "Total Tickets",
+                prefixIcon: const Icon(Icons.confirmation_number),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
                 ),
               ),
+              onChanged: (value) {
+                setState(() {
+                  totalTickets =
+                      int.tryParse(value) ?? 100;
+                });
+              },
+            ),
+
+            const SizedBox(height: 18),
+
+          SwitchListTile(
+  activeColor: Colors.green,
+  activeTrackColor: Colors.green.shade300,
+              value: limitPerUser,
+              title: const Text("Limit tickets per user"),
+              onChanged: (value) {
+                setState(() {
+                  limitPerUser = value;
+                });
+              },
+            ),
+
+            if (limitPerUser) ...[
+              const SizedBox(height: 12),
+
+              TextField(
+                controller: maxTicketsController,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: "Maximum Per User",
+                  border: OutlineInputBorder(
+                    borderRadius:
+                        BorderRadius.circular(16),
+                  ),
+                ),
+                onChanged: (value) {
+                  setState(() {
+                    maxTicketsPerUser =
+                        int.tryParse(value) ?? 5;
+                  });
+                },
+              ),
             ],
-          ),
+
+            const SizedBox(height: 30),
+                        //---------------------------------------------------
+            // WINNERS
+            //---------------------------------------------------
+
+            const Text(
+              "Number of Winners",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(18),
+                side: BorderSide(color: Colors.grey.shade300),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 14,
+                ),
+                child: Row(
+                  children: [
+
+                    IconButton(
+                      onPressed: () {
+                        if (numberOfWinners > 1) {
+                          setState(() {
+                            numberOfWinners--;
+                          });
+                        }
+                      },
+                      icon: const Icon(Icons.remove_circle),
+                    ),
+
+                    Expanded(
+                      child: Center(
+                        child: Text(
+                          "$numberOfWinners Winner${numberOfWinners == 1 ? "" : "s"}",
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    IconButton(
+                      onPressed: () {
+                        setState(() {
+                          numberOfWinners++;
+                        });
+                      },
+                      icon: const Icon(Icons.add_circle),
+                    ),
+
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 30),
+
+            //---------------------------------------------------
+            // LOTTERY TYPE
+            //---------------------------------------------------
+
+            const Text(
+              "Lottery Type",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+          SegmentedButton<String>(
+  style: ButtonStyle(
+    backgroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.selected)) {
+        return Colors.green;
+      }
+      return Colors.white;
+    }),
+    foregroundColor: WidgetStateProperty.resolveWith((states) {
+      if (states.contains(WidgetState.selected)) {
+        return Colors.white;
+      }
+      return Colors.black;
+    }),
+    side: WidgetStateProperty.all(
+      const BorderSide(color: Colors.green),
+    ),
+  ),
+              segments: const [
+
+                ButtonSegment(
+                  value: "oneTime",
+                  label: Text("One-Time"),
+                  icon: Icon(Icons.event),
+                ),
+
+                ButtonSegment(
+                  value: "Hourly",
+                  label: Text("Hourly"),
+                ),
+
+                ButtonSegment(
+                  value: "Daily",
+                  label: Text("Daily"),
+                ),
+
+                ButtonSegment(
+                  value: "Weekly",
+                  label: Text("Weekly"),
+                ),
+
+              ],
+
+              selected: {
+                lotteryType == "oneTime"
+                    ? "oneTime"
+                    : drawFrequency
+              },
+
+              onSelectionChanged: (value) {
+
+                setState(() {
+
+                  if (value.first == "oneTime") {
+
+                    lotteryType = "oneTime";
+
+                  } else {
+
+                    lotteryType = "recurring";
+
+                    drawFrequency = value.first;
+
+                  }
+
+                  calculateNextDraw();
+
+                });
+
+              },
+
+            ),
+
+            const SizedBox(height: 25),
+
+            if (lotteryType == "oneTime")
+
+              ListTile(
+
+                leading: const Icon(Icons.calendar_today),
+
+                title: Text(
+
+                  "${nextDrawAt.day}/${nextDrawAt.month}/${nextDrawAt.year}",
+
+                ),
+
+                subtitle: const Text("Tap to choose draw date"),
+
+                trailing: const Icon(Icons.edit),
+
+                onTap: () async {
+
+                  final picked = await showDatePicker(
+
+                    context: context,
+
+                    initialDate: nextDrawAt,
+
+                    firstDate: DateTime.now(),
+
+                    lastDate: DateTime(2100),
+
+                  );
+
+                  if (picked == null) return;
+
+                  setState(() {
+
+                    nextDrawAt = DateTime(
+
+                      picked.year,
+
+                      picked.month,
+
+                      picked.day,
+
+                      nextDrawAt.hour,
+
+                      nextDrawAt.minute,
+
+                    );
+
+                  });
+
+                },
+
+              ),
+
+            const SizedBox(height: 30),
+
+            //---------------------------------------------------
+            // VISIBILITY
+            //---------------------------------------------------
+
+            const Text(
+              "Visibility",
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            Row(
+
+              children: [
+
+                Expanded(
+
+                  child: GestureDetector(
+
+                    onTap: () {
+
+                      setState(() {
+
+                        isPublic = true;
+
+                      });
+
+                    },
+
+                    child: AnimatedContainer(
+
+                      duration: const Duration(milliseconds: 250),
+
+                      padding: const EdgeInsets.all(20),
+
+                      decoration: BoxDecoration(
+
+                        color: isPublic
+                            ? Colors.green.shade50
+                            : Colors.white,
+
+                        borderRadius: BorderRadius.circular(18),
+
+                        border: Border.all(
+
+                          color: isPublic
+                              ? Colors.green
+                              : Colors.grey.shade300,
+
+                          width: 2,
+
+                        ),
+
+                      ),
+
+                      child: const Column(
+
+                        children: [
+
+                          Icon(Icons.public),
+
+                          SizedBox(height: 10),
+
+                          Text(
+
+                            "Public",
+
+                            style: TextStyle(
+
+                              fontWeight: FontWeight.bold,
+
+                            ),
+
+                          ),
+
+                        ],
+
+                      ),
+
+                    ),
+
+                  ),
+
+                ),
+
+                const SizedBox(width: 15),
+
+                Expanded(
+
+                  child: GestureDetector(
+
+                    onTap: () {
+
+                      setState(() {
+
+                        isPublic = false;
+
+                      });
+
+                    },
+
+                    child: AnimatedContainer(
+
+                      duration: const Duration(milliseconds: 250),
+
+                      padding: const EdgeInsets.all(20),
+
+                      decoration: BoxDecoration(
+
+                        color: !isPublic
+                            ? Colors.green.shade50
+                            : Colors.white,
+
+                        borderRadius: BorderRadius.circular(18),
+
+                        border: Border.all(
+
+                          color: !isPublic
+                              ? Colors.green
+                              : Colors.grey.shade300,
+
+                          width: 2,
+
+                        ),
+
+                      ),
+
+                      child: const Column(
+
+                        children: [
+
+                          Icon(Icons.lock),
+
+                          SizedBox(height: 10),
+
+                          Text(
+
+                            "Private",
+
+                            style: TextStyle(
+
+                              fontWeight: FontWeight.bold,
+
+                            ),
+
+                          ),
+
+                        ],
+
+                      ),
+
+                    ),
+
+                  ),
+
+                ),
+
+              ],
+
+            ),
+
+            const SizedBox(height: 30),
+
+            //---------------------------------------------------
+            // SUMMARY
+            //---------------------------------------------------
+
+            Card(
+
+              shape: RoundedRectangleBorder(
+
+                borderRadius: BorderRadius.circular(20),
+
+              ),
+
+              child: Padding(
+
+                padding: const EdgeInsets.all(20),
+
+                child: Column(
+
+                  children: [
+
+                    const Text(
+
+                      "Summary",
+
+                      style: TextStyle(
+
+                        fontSize: 22,
+
+                        fontWeight: FontWeight.bold,
+
+                      ),
+
+                    ),
+
+                    const Divider(height: 30),
+
+                    summaryRow(
+                      "Revenue",
+                      "\$${revenue.toStringAsFixed(2)}",
+                    ),
+
+                    summaryRow(
+                      "Jackpot",
+                      "\$${jackpot.toStringAsFixed(2)}",
+                    ),
+
+                    summaryRow(
+                      "LuckyEta Fee",
+                      "\$${fee.toStringAsFixed(2)}",
+                    ),
+
+                    const Divider(),
+
+                    summaryRow(
+                      "Creator Profit",
+                      "\$${creatorProfit.toStringAsFixed(2)}",
+                      bold: true,
+                    ),
+
+                  ],
+
+                ),
+
+              ),
+
+            ),
+
+            const SizedBox(height: 35),
+
+            SizedBox(
+
+              width: double.infinity,
+
+              height: 58,
+
+              child: ElevatedButton.icon(
+  style: ElevatedButton.styleFrom(
+    backgroundColor: Colors.green,
+    foregroundColor: Colors.white,
+    minimumSize: const Size(double.infinity, 60),
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(18),
+    ),
+  ),
+
+                onPressed: launchLottery,
+
+                icon: const Icon(Icons.rocket_launch),
+
+                label: const Text(
+
+                  "Launch Lottery",
+
+                  style: TextStyle(
+                    fontSize: 18,
+                  ),
+
+                ),
+
+              ),
+
+            ),
+
+            const SizedBox(height: 40),
+
+          ],
+
         ),
+
+      ),
+
+    );
+
+  }
+
+  Widget summaryRow(
+    String title,
+    String value, {
+    bool bold = false,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontWeight:
+                    bold ? FontWeight.bold : FontWeight.w500,
+              ),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(
+              fontWeight:
+                  bold ? FontWeight.bold : FontWeight.w700,
+              fontSize: bold ? 18 : 16,
+            ),
+          ),
+        ],
       ),
     );
   }
