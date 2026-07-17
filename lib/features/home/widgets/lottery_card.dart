@@ -447,19 +447,95 @@ class _LotteryCardState extends State<LotteryCard> {
                   )
 
 
-                else
+               else
 
-                  ElevatedButton(
+Column(
 
-                    onPressed:(){},
+  crossAxisAlignment:
+      CrossAxisAlignment.start,
+
+  children: [
+
+    const SizedBox(height:10),
 
 
-                    child:
-                      const Text(
-                        "Buy Tickets",
-                      ),
+    Row(
 
-                  )
+      mainAxisAlignment:
+          MainAxisAlignment.spaceBetween,
+
+      children: [
+
+        Text(
+          "🎟 \$${lottery.pricePerTicket} / ticket",
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+
+
+        Text(
+          "🏆 ${lottery.numberOfWinners} Winners",
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+
+      ],
+
+    ),
+
+
+    const SizedBox(height:10),
+
+
+    Row(
+
+      children: [
+
+        const Icon(
+          Icons.schedule,
+          size:18,
+        ),
+
+        const SizedBox(width:5),
+
+
+        Text(
+          lottery.drawFrequency,
+        ),
+
+      ],
+
+    ),
+
+
+    const SizedBox(height:10),
+
+
+    Row(
+
+      children:[
+
+        const Icon(
+          Icons.confirmation_num,
+          size:18,
+        ),
+
+        const SizedBox(width:5),
+
+
+        Text(
+          "${lottery.ticketsSold}/${lottery.totalTickets} Tickets Sold",
+        ),
+
+      ],
+
+    ),
+
+  ],
+
+)
 
               ],
 

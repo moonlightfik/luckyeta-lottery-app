@@ -3,7 +3,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 import 'widgets/lottery_card.dart';
-
+import 'widgets/my_luck_preview.dart';
+import '../notifications/notification_screen.dart';
 import '../../navigation/bottom_nav_screen.dart';
 import '../buy_ticket/buy_ticket_screen.dart';
 import '../create_lottery/create_lottery.dart';
@@ -165,7 +166,24 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
 
                   ),
+const Spacer(),
 
+IconButton(
+  icon: const Icon(
+    Icons.notifications_none,
+    size: 30,
+  ),
+  onPressed: () {
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const NotificationScreen(),
+      ),
+    );
+
+  },
+),
 
                 ],
 
@@ -380,7 +398,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               SizedBox(
 
-                height:430,
+                height:500,
 
                 child:
                 StreamBuilder<QuerySnapshot>(
@@ -527,82 +545,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
               // MY LUCK SECTION PLACEHOLDER
 
-              const Text(
-
-                "My Luck",
-
-                style:
-                    TextStyle(
-
-                      fontSize:20,
-
-                      fontWeight:
-                          FontWeight.bold,
-
-                    ),
-
-              ),
-
-
-
-              const SizedBox(height:12),
-
-
-
-              Container(
-
-                width:
-                    double.infinity,
-
-
-                padding:
-                    const EdgeInsets.all(20),
-
-
-                decoration:
-                    BoxDecoration(
-
-                      borderRadius:
-                          BorderRadius.circular(20),
-
-                      color:
-                          Colors.grey.shade100,
-
-                    ),
-
-
-                child:
-                    const Column(
-
-                      children:[
-
-
-                        Text(
-                          "🎟 Running",
-                        ),
-
-
-                        SizedBox(height:12),
-
-
-                        Text(
-                          "🏆 Won",
-                        ),
-
-
-                        SizedBox(height:12),
-
-
-                        Text(
-                          "❌ Lost",
-                        ),
-
-
-                      ],
-
-                    ),
-
-              ),
+            const MyLuckPreview(),
 
 
             ],
