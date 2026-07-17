@@ -2,286 +2,619 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
+import 'widgets/lottery_card.dart';
+
 import '../../navigation/bottom_nav_screen.dart';
 import '../buy_ticket/buy_ticket_screen.dart';
 import '../create_lottery/create_lottery.dart';
 import '../../models/lottery_model.dart';
 
+
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+
+  const HomeScreen({
+    super.key,
+  });
+
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  State<HomeScreen> createState() =>
+      _HomeScreenState();
+
 }
 
+
+
 class _HomeScreenState extends State<HomeScreen> {
-  final user = FirebaseAuth.instance.currentUser;
+
+
+  final user =
+      FirebaseAuth.instance.currentUser;
+
+
   late String username;
+
+
 
   @override
   void initState() {
+
     super.initState();
-    username = user?.displayName ?? 'Player';
+
+    username =
+        user?.displayName ?? "Player";
+
   }
+
+
 
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
+
       body: SafeArea(
+
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
+
+          padding:
+              const EdgeInsets.all(16),
+
+
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
+
+
             children: [
-              // Header
+
+
+              // HEADER
+
               Row(
+
                 children: [
+
+
                   GestureDetector(
+
                     onTap: () {
+
                       Navigator.push(
+
                         context,
+
                         MaterialPageRoute(
+
                           builder: (_) =>
-                              const BottomNavScreen(initialIndex: 3),
+                              const BottomNavScreen(
+                                initialIndex: 3,
+                              ),
+
                         ),
+
                       );
+
                     },
+
+
                     child: const CircleAvatar(
+
                       radius: 25,
-                      backgroundImage: AssetImage('assets/avatar.png'),
+
+                      backgroundImage:
+                          AssetImage(
+                            "assets/avatar.png",
+                          ),
+
                     ),
+
                   ),
-                  const SizedBox(width: 12),
+
+
+
+                  const SizedBox(width:12),
+
+
+
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
+
+                    crossAxisAlignment:
+                        CrossAxisAlignment.start,
+
+
+                    children:[
+
+
                       const Text(
-                        'WELCOME BACK',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
+
+                        "WELCOME BACK",
+
+                        style:
+                            TextStyle(
+
+                              fontSize:12,
+
+                              color:
+                                  Colors.grey,
+
+                            ),
+
                       ),
+
+
+
                       Text(
-                        'Good Luck, $username!',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
+
+                        "Good Luck, $username!",
+
+                        style:
+                            const TextStyle(
+
+                              fontSize:18,
+
+                              fontWeight:
+                                  FontWeight.bold,
+
+                            ),
+
                       ),
+
+
                     ],
+
                   ),
+
+
                 ],
+
               ),
 
-              const SizedBox(height: 24),
 
-              // Action Buttons
+
+              const SizedBox(height:24),
+
+
+
+              // ACTION BUTTONS
+
               Row(
-                children: [
+
+                children:[
+
+
                   Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
+
+                    child:
+                    ElevatedButton.icon(
+
+                      onPressed:(){
+
                         Navigator.push(
+
                           context,
+
                           MaterialPageRoute(
-                            builder: (_) => const CreateLotteryScreen(),
+
+                            builder:(_)=>
+                                const CreateLotteryScreen(),
+
                           ),
+
                         );
+
                       },
-                      icon: const Icon(Icons.add),
-                      label: const Text('Create Lottery'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+
+
+                      icon:
+                          const Icon(Icons.add),
+
+
+                      label:
+                          const Text(
+                            "Create Lottery",
+                          ),
+
+
+                      style:
+                          ElevatedButton.styleFrom(
+
+                            backgroundColor:
+                                Colors.green,
+
+                            foregroundColor:
+                                Colors.white,
+
+                            padding:
+                                const EdgeInsets.symmetric(
+                                  vertical:14,
+                                ),
+
+                            shape:
+                                RoundedRectangleBorder(
+
+                                  borderRadius:
+                                      BorderRadius.circular(12),
+
+                                ),
+
+                          ),
+
                     ),
+
                   ),
-                  const SizedBox(width: 12),
+
+
+
+                  const SizedBox(width:12),
+
+
+
                   Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {
+
+                    child:
+                    OutlinedButton.icon(
+
+                      onPressed:(){
+
                         Navigator.push(
+
                           context,
+
                           MaterialPageRoute(
-                            builder: (_) =>
-                                const BottomNavScreen(initialIndex: 1),
+
+                            builder:(_)=>
+                                const BottomNavScreen(
+                                  initialIndex:1,
+                                ),
+
                           ),
+
                         );
+
                       },
-                      icon: const Icon(
-                        Icons.confirmation_num,
-                        color: Colors.green,
-                      ),
-                      label: const Text(
-                        'Buy Tickets',
-                        style: TextStyle(color: Colors.green),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        side: const BorderSide(color: Colors.green),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
+
+
+                      icon:
+                          const Icon(
+                            Icons.confirmation_num,
+                            color:Colors.green,
+                          ),
+
+
+                      label:
+                          const Text(
+
+                            "Buy Tickets",
+
+                            style:
+                                TextStyle(
+                                  color:Colors.green,
+                                ),
+
+                          ),
+
                     ),
+
                   ),
+
+
                 ],
+
               ),
 
-              const SizedBox(height: 24),
 
-              // Featured Jackpots
+
+              const SizedBox(height:24),
+                            // FEATURED JACKPOTS
+
               Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+                mainAxisAlignment:
+                    MainAxisAlignment.spaceBetween,
+
                 children: [
+
                   const Text(
-                    'Featured Jackpots',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const BottomNavScreen(initialIndex: 1),
+
+                    "Featured Jackpots",
+
+                    style:
+                        TextStyle(
+
+                          fontSize:18,
+
+                          fontWeight:
+                              FontWeight.bold,
+
                         ),
-                      );
-                    },
-                    child: const Text(
-                      'View All',
-                      style: TextStyle(color: Colors.green),
-                    ),
+
                   ),
+
+
+                  TextButton(
+
+                    onPressed:(){
+
+                      Navigator.push(
+
+                        context,
+
+                        MaterialPageRoute(
+
+                          builder:(_)=>
+                              const BottomNavScreen(
+                                initialIndex:1,
+                              ),
+
+                        ),
+
+                      );
+
+                    },
+
+                    child:
+                        const Text(
+
+                          "View All",
+
+                          style:
+                              TextStyle(
+                                color:Colors.green,
+                              ),
+
+                        ),
+
+                  ),
+
                 ],
+
               ),
 
-              const SizedBox(height: 12),
 
-              // Lottery List
+
+              const SizedBox(height:12),
+
+
+
               SizedBox(
-                height: 200,
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('lotteries')
-                      .where('isPublic', isEqualTo: true)
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.connectionState ==
-                        ConnectionState.waiting) {
+
+                height:430,
+
+                child:
+                StreamBuilder<QuerySnapshot>(
+
+                  stream:
+                      FirebaseFirestore.instance
+                          .collection("lotteries")
+                          .where(
+                            "isPublic",
+                            isEqualTo:true,
+                          )
+                          .where(
+                            "status",
+                            isEqualTo:"ACTIVE",
+                          )
+                          .orderBy(
+                            "createdAt",
+                            descending:true,
+                          )
+                          .snapshots(),
+
+
+                  builder:(context,snapshot){
+
+
+                    if(snapshot.connectionState ==
+                        ConnectionState.waiting){
+
                       return const Center(
-                        child: CircularProgressIndicator(),
+
+                        child:
+                            CircularProgressIndicator(),
+
                       );
+
                     }
 
-                    if (!snapshot.hasData ||
-                        snapshot.data!.docs.isEmpty) {
+
+
+                    if(!snapshot.hasData ||
+                       snapshot.data!.docs.isEmpty){
+
                       return const Center(
-                        child: Text('No lotteries available'),
+
+                        child:
+                            Text(
+                              "No lotteries available",
+                            ),
+
                       );
+
                     }
 
-                    final docs = snapshot.data!.docs;
+
+
+                    final lotteries =
+                        snapshot.data!.docs;
+
+
 
                     return ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: docs.length,
-                      itemBuilder: (context, index) {
-                        final data =
-                            docs[index].data() as Map<String, dynamic>;
 
-                        final lottery = Lottery(
-                          id: docs[index].id,
-                          title: data['title'] ?? 'Untitled',
-                          jackpot: data['jackpot'] ?? 0,
-                          pricePerTicket:
-                              data['pricePerTicket'] ?? 0,
-                          drawFrequency:
-                              data['drawFrequency'] ?? 'Daily',
+                      scrollDirection:
+                          Axis.horizontal,
 
-                          // null safe fix 
-                          nextDrawAt:
-                              (data['nextDrawAt'] as Timestamp?)
-                                      ?.toDate() ??
-                                  DateTime.now(),
-                          createdAt:
-                              (data['createdAt'] as Timestamp?)
-                                      ?.toDate() ??
-                                  DateTime.now(),
 
-                          totalTickets: data['totalTickets'] ?? 0,
-                          maxTicketsPerUser:
-                              data['maxTicketsPerUser'] ?? 1,
-                          status: data['status'] ?? 'ACTIVE',
-                          creatorId: data['creatorId'] ?? '',
-                          isPublic: data['isPublic'] ?? true,
-                        );
+                      itemCount:
+                          lotteries.length,
 
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    BuyTicketScreen(lottery: lottery),
-                              ),
+
+                      itemBuilder:(context,index){
+
+
+                        final doc =
+                            lotteries[index];
+
+
+
+                        final lottery =
+                            Lottery.fromFirestore(
+
+                              doc.id,
+
+                              doc.data()
+                                  as Map<String,dynamic>,
+
                             );
-                          },
-                          child: Container(
-                            width: 250,
-                            margin: const EdgeInsets.only(right: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade300,
-                              borderRadius:
-                                  BorderRadius.circular(20),
+
+
+
+                        return SizedBox(
+
+                          width:300,
+
+                          child:
+                          GestureDetector(
+
+                            onTap:(){
+
+                              Navigator.push(
+
+                                context,
+
+                                MaterialPageRoute(
+
+                                  builder:(_)=>
+                                      BuyTicketScreen(
+                                        lottery:lottery,
+                                      ),
+
+                                ),
+
+                              );
+
+                            },
+
+
+                            child:
+                            LotteryCard(
+
+                              lottery:lottery,
+
                             ),
-                            child: Column(
-                              mainAxisAlignment:
-                                  MainAxisAlignment.end,
-                              crossAxisAlignment:
-                                  CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  lottery.title,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Jackpot: \$${lottery.jackpot}',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.green,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Next draw: ${lottery.nextDrawAt}',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
+
                           ),
+
                         );
+
                       },
+
                     );
+
                   },
+
                 ),
+
               ),
+
+
+
+              const SizedBox(height:30),
+
+
+
+              // MY LUCK SECTION PLACEHOLDER
+
+              const Text(
+
+                "My Luck",
+
+                style:
+                    TextStyle(
+
+                      fontSize:20,
+
+                      fontWeight:
+                          FontWeight.bold,
+
+                    ),
+
+              ),
+
+
+
+              const SizedBox(height:12),
+
+
+
+              Container(
+
+                width:
+                    double.infinity,
+
+
+                padding:
+                    const EdgeInsets.all(20),
+
+
+                decoration:
+                    BoxDecoration(
+
+                      borderRadius:
+                          BorderRadius.circular(20),
+
+                      color:
+                          Colors.grey.shade100,
+
+                    ),
+
+
+                child:
+                    const Column(
+
+                      children:[
+
+
+                        Text(
+                          "🎟 Running",
+                        ),
+
+
+                        SizedBox(height:12),
+
+
+                        Text(
+                          "🏆 Won",
+                        ),
+
+
+                        SizedBox(height:12),
+
+
+                        Text(
+                          "❌ Lost",
+                        ),
+
+
+                      ],
+
+                    ),
+
+              ),
+
+
             ],
+
           ),
+
         ),
+
       ),
+
     );
+
   }
+
 }

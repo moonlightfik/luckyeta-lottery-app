@@ -188,66 +188,79 @@ class _CreateLotteryScreenState
     await FirebaseFirestore.instance
         .collection("lotteries")
         .add({
-      "title":
-          titleController.text.trim(),
+  // -------------------------------
+  // Basic Information
+  // -------------------------------
+  "title": titleController.text.trim(),
+  "description": descriptionController.text.trim(),
 
-      "description":
-          descriptionController.text.trim(),
+  // -------------------------------
+  // Prize
+  // -------------------------------
+  "jackpot": jackpot,
 
-      "category":
-          selectedCategory,
+  // -------------------------------
+  // Ticket Settings
+  // -------------------------------
+  "pricePerTicket": pricePerTicket,
+  "totalTickets": totalTickets,
+  "ticketsSold": 0,
+  "remainingTickets": totalTickets,
+  "maxTicketsPerUser": maxTicketsPerUser,
 
-      "themeColor":
-          selectedTheme.value,
+  // -------------------------------
+  // Winners
+  // -------------------------------
+  "numberOfWinners": numberOfWinners,
+  "winnerIds": [],
 
-      "cardStyle":
-          selectedStyle,
+  // -------------------------------
+  // Lottery Type
+  // -------------------------------
+  "lotteryType": lotteryType,
 
-      "imageUrl":
-          imageUrl,
+  "drawFrequency":
+      lotteryType == "recurring"
+          ? drawFrequency
+          : null,
 
-      "jackpot": jackpot,
+  "nextDrawAt":
+      Timestamp.fromDate(nextDrawAt),
 
-      "pricePerTicket":
-          pricePerTicket,
+  // -------------------------------
+  // Appearance
+  // -------------------------------
+  "category": selectedCategory,
+  "cardStyle": selectedStyle,
+  "themeColor": selectedTheme.value,
+  "imageUrl": imageUrl,
 
-      "totalTickets":
-          totalTickets,
+  // -------------------------------
+  // Visibility
+  // -------------------------------
+  "isPublic": isPublic,
 
-      "maxTicketsPerUser":
-          limitPerUser
-              ? maxTicketsPerUser
-              : null,
+  // -------------------------------
+  // Status
+  // -------------------------------
+  "status": "ACTIVE",
 
-      "numberOfWinners":
-          numberOfWinners,
+  // -------------------------------
+  // Creator
+  // -------------------------------
+  "creatorId":
+      FirebaseAuth.instance.currentUser!.uid,
 
-      "lotteryType":
-          lotteryType,
+  "creatorName":
+      FirebaseAuth.instance.currentUser?.displayName ??
+      "LuckyEta User",
 
-      "drawFrequency":
-          lotteryType ==
-                  "recurring"
-              ? drawFrequency
-              : null,
-
-      "nextDrawAt":
-          Timestamp.fromDate(
-              nextDrawAt),
-
-      "isPublic":
-          isPublic,
-
-      "creatorId":
-          FirebaseAuth.instance
-              .currentUser!
-              .uid,
-
-      "status": "ACTIVE",
-
-      "createdAt":
-          FieldValue.serverTimestamp(),
-    });
+  // -------------------------------
+  // Time
+  // -------------------------------
+  "createdAt":
+      FieldValue.serverTimestamp(),
+});
 
     if (!mounted) return;
 

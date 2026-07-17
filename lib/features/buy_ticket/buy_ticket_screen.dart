@@ -51,46 +51,143 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
   }
 
   // ================= PURCHASE =================
-  Future<void> _purchaseTickets() async {
-    if (selectedTickets.isEmpty) return;
+ Future<void> _purchaseTickets() async {
+  if (selectedTickets.isEmpty) return;
 
-    setState(() => isPurchasing = true);
+  setState(() => isPurchasing = true);
 
-    try {
-      final batch = FirebaseFirestore.instance.batch();
-      final ref = FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('tickets');
+  try {
+    final firestore = FirebaseFirestore.instance;
 
+    final lotteryRef = firestore
+        .collection('lotteries')
+        .doc(widget.lottery.id);
+
+    final userTicketsRef = firestore
+        .collection('users')
+        .doc(userId)
+        .collection('tickets');
+
+    await firestore.runTransaction((transaction) async {
+
+      // Get latest lottery data
+      final lotterySnapshot =
+          await transaction.get(lotteryRef);
+
+      if (!lotterySnapshot.exists) {
+        throw Exception("Lottery no longer exists");
+      }
+
+      final data = lotterySnapshot.data()!;
+
+      final int totalTickets =
+          data['totalTickets'] ?? 0;
+
+      final int currentSold =
+          data['ticketsSold'] ?? 0;
+
+      final int buyingAmount =
+          selectedTickets.length;
+
+      final int newSold =
+          currentSold + buyingAmount;
+
+      final int remaining =
+          totalTickets - newSold;
+
+
+      // Prevent buying more than available
+      if (remaining < 0) {
+        throw Exception(
+          "Not enough tickets available",
+        );
+      }
+
+
+      // Create user tickets
       for (final ticket in selectedTickets) {
-        batch.set(ref.doc(), {
+
+        final ticketRef =
+            userTicketsRef.doc();
+
+        transaction.set(ticketRef, {
+
           'userId': userId,
-          'lotteryID': widget.lottery.id,
-          'lotteryTitle': widget.lottery.title,
-          'ticketNumber': ticket,
-          'pricePerTicket': widget.lottery.pricePerTicket,
-          'status': 'ACTIVE',
-          'purchasedAt': FieldValue.serverTimestamp(),
+
+          'lotteryID':
+              widget.lottery.id,
+
+          'lotteryTitle':
+              widget.lottery.title,
+
+          'ticketNumber':
+              ticket,
+
+          'pricePerTicket':
+              widget.lottery.pricePerTicket,
+
+          'status':
+              'ACTIVE',
+
+          'purchasedAt':
+              FieldValue.serverTimestamp(),
         });
       }
 
-      await batch.commit();
 
-      setState(() {
-        selectedTickets.clear();
-        isPurchasing = false;
-      });
+      // Update lottery
+      transaction.update(
+        lotteryRef,
+        {
 
-      _showReceipt();
-    } catch (e) {
-      setState(() {
-        isPurchasing = false;
-        errorMessage = 'Failed to purchase: $e';
-      });
-      _showErrorDialog('Purchase Failed', 'Could not complete purchase. Please try again.');
-    }
+          'ticketsSold':
+              newSold,
+
+          'remainingTickets':
+              remaining,
+
+          'status':
+              remaining <= 0
+                  ? 'SOLD_OUT'
+                  : 'ACTIVE',
+
+        },
+      );
+
+    });
+
+
+    setState(() {
+
+      selectedTickets.clear();
+
+      isPurchasing = false;
+
+    });
+
+
+    _showReceipt();
+
+
+  } catch (e) {
+
+    setState(() {
+
+      isPurchasing = false;
+
+      errorMessage =
+          'Failed to purchase: $e';
+
+    });
+
+
+    _showErrorDialog(
+      'Purchase Failed',
+      'Could not complete purchase. Please try again.',
+    );
+
   }
+}
 
   void _showReceipt() {
     showDialog(
