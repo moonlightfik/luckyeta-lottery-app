@@ -424,17 +424,16 @@ IconButton(
                   builder:(context,snapshot){
 
 
-                    if(snapshot.connectionState ==
-                        ConnectionState.waiting){
+                   if(snapshot.connectionState ==
+    ConnectionState.waiting){
 
-                      return const Center(
+  return const Center(
+    child: CircularProgressIndicator(
+      color: Colors.green,
+    ),
+  );
 
-                        child:
-                            CircularProgressIndicator(),
-
-                      );
-
-                    }
+}
 
 
 
