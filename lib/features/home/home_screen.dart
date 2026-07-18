@@ -9,6 +9,8 @@ import '../../navigation/bottom_nav_screen.dart';
 import '../buy_ticket/buy_ticket_screen.dart';
 import '../create_lottery/create_lottery.dart';
 import '../../models/lottery_model.dart';
+import '../../services/lottery_draw_service.dart';
+
 
 
 class HomeScreen extends StatefulWidget {
@@ -33,6 +35,10 @@ class _HomeScreenState extends State<HomeScreen> {
       FirebaseAuth.instance.currentUser;
 
 
+  final LotteryDrawService _drawService =
+      LotteryDrawService();
+
+
   late String username;
 
 
@@ -44,6 +50,27 @@ class _HomeScreenState extends State<HomeScreen> {
 
     username =
         user?.displayName ?? "Player";
+
+
+    _checkLotteryDraws();
+
+  }
+
+
+
+  Future<void> _checkLotteryDraws() async {
+
+    try {
+
+      await _drawService.checkAndDrawLotteries();
+
+    } catch (e) {
+
+      debugPrint(
+        "Lottery draw error: $e",
+      );
+
+    }
 
   }
 
@@ -166,24 +193,42 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
 
                   ),
-const Spacer(),
 
-IconButton(
-  icon: const Icon(
-    Icons.notifications_none,
-    size: 30,
-  ),
-  onPressed: () {
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const NotificationScreen(),
-      ),
-    );
 
-  },
-),
+                  const Spacer(),
+
+
+
+                  IconButton(
+
+                    icon: const Icon(
+
+                      Icons.notifications_none,
+
+                      size:30,
+
+                    ),
+
+
+                    onPressed: () {
+
+                      Navigator.push(
+
+                        context,
+
+                        MaterialPageRoute(
+
+                          builder: (_) =>
+                              const NotificationScreen(),
+
+                        ),
+
+                      );
+
+                    },
+
+                  ),
 
                 ],
 
@@ -206,6 +251,7 @@ IconButton(
 
                     child:
                     ElevatedButton.icon(
+
 
                       onPressed:(){
 
@@ -274,6 +320,7 @@ IconButton(
                     child:
                     OutlinedButton.icon(
 
+
                       onPressed:(){
 
                         Navigator.push(
@@ -296,8 +343,11 @@ IconButton(
 
                       icon:
                           const Icon(
+
                             Icons.confirmation_num,
+
                             color:Colors.green,
+
                           ),
 
 
@@ -325,7 +375,10 @@ IconButton(
 
 
               const SizedBox(height:24),
-                            // FEATURED JACKPOTS
+
+
+
+              // FEATURED JACKPOTS
 
               Row(
 
@@ -333,6 +386,7 @@ IconButton(
                     MainAxisAlignment.spaceBetween,
 
                 children: [
+
 
                   const Text(
 
@@ -349,6 +403,7 @@ IconButton(
                         ),
 
                   ),
+
 
 
                   TextButton(
@@ -372,6 +427,7 @@ IconButton(
 
                     },
 
+
                     child:
                         const Text(
 
@@ -379,7 +435,9 @@ IconButton(
 
                           style:
                               TextStyle(
+
                                 color:Colors.green,
+
                               ),
 
                         ),
@@ -400,52 +458,81 @@ IconButton(
 
                 height:500,
 
+
                 child:
+
                 StreamBuilder<QuerySnapshot>(
 
                   stream:
+
                       FirebaseFirestore.instance
+
                           .collection("lotteries")
+
                           .where(
+
                             "isPublic",
+
                             isEqualTo:true,
+
                           )
+
                           .where(
+
                             "status",
+
                             isEqualTo:"ACTIVE",
+
                           )
+
                           .orderBy(
+
                             "createdAt",
+
                             descending:true,
+
                           )
+
                           .snapshots(),
+
 
 
                   builder:(context,snapshot){
 
 
-                   if(snapshot.connectionState ==
-    ConnectionState.waiting){
+                    if(snapshot.connectionState ==
+                        ConnectionState.waiting){
 
-  return const Center(
-    child: CircularProgressIndicator(
-      color: Colors.green,
-    ),
-  );
 
-}
+                      return const Center(
+
+                        child:
+
+                        CircularProgressIndicator(
+
+                          color:Colors.green,
+
+                        ),
+
+                      );
+
+                    }
 
 
 
                     if(!snapshot.hasData ||
                        snapshot.data!.docs.isEmpty){
 
+
                       return const Center(
 
                         child:
-                            Text(
-                              "No lotteries available",
-                            ),
+
+                        Text(
+
+                          "No lotteries available",
+
+                        ),
 
                       );
 
@@ -492,7 +579,9 @@ IconButton(
 
                           width:300,
 
+
                           child:
+
                           GestureDetector(
 
                             onTap:(){
@@ -505,7 +594,9 @@ IconButton(
 
                                   builder:(_)=>
                                       BuyTicketScreen(
+
                                         lottery:lottery,
+
                                       ),
 
                                 ),
@@ -516,6 +607,7 @@ IconButton(
 
 
                             child:
+
                             LotteryCard(
 
                               lottery:lottery,
@@ -542,9 +634,7 @@ IconButton(
 
 
 
-              // MY LUCK SECTION PLACEHOLDER
-
-            const MyLuckPreview(),
+              const MyLuckPreview(),
 
 
             ],
