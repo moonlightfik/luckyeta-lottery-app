@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/lottery_model.dart';
+import '../../services/notification_service.dart';
 
 class BuyTicketScreen extends StatefulWidget {
   final Lottery lottery;
@@ -16,6 +17,8 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
   final Set<int> selectedTickets = {};
   bool isPurchasing = false;
   late final String userId;
+  final NotificationService _notificationService =
+    NotificationService();
   String? errorMessage;
 
   @override
@@ -137,23 +140,28 @@ class _BuyTicketScreenState extends State<BuyTicketScreen> {
 
       // Update lottery
       transaction.update(
-        lotteryRef,
-        {
+  lotteryRef,
+  {
+    'ticketsSold': newSold,
+    'remainingTickets': remaining,
+    'status': remaining <= 0
+        ? 'SOLD_OUT'
+        : 'ACTIVE',
+  },
+);
 
-          'ticketsSold':
-              newSold,
+// Notify creator if the lottery just sold out
+if (remaining <= 0) {
 
-          'remainingTickets':
-              remaining,
+  await _notificationService.notifyLotterySoldOut(
+    creatorId: data['creatorId'],
+    creatorName: data['creatorName'] ?? 'Creator',
+    lotteryId: widget.lottery.id,
+    lotteryTitle: data['title'],
+    totalTickets: totalTickets,
+  );
 
-          'status':
-              remaining <= 0
-                  ? 'SOLD_OUT'
-                  : 'ACTIVE',
-
-        },
-      );
-
+}
     });
 
 

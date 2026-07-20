@@ -1,9 +1,12 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../models/lottery_model.dart';
 
+import 'creator_lottery_menu.dart';
+import '../../create_lottery/edit_lottery_screen.dart';
 
 class LotteryCard extends StatefulWidget {
 
@@ -225,40 +228,161 @@ class _LotteryCardState extends State<LotteryCard> {
                   ),
 
 
+Positioned(
 
-                  Positioned(
+  top:15,
 
-                    top:15,
+  right:15,
 
-                    right:15,
+  child:
 
-                    child: Container(
+  FirebaseAuth.instance.currentUser?.uid ==
+      lottery.creatorId
 
-                      padding:
-                          const EdgeInsets.all(8),
+      ? CreatorLotteryMenu(
 
-                      decoration:
-                          const BoxDecoration(
+        onEdit: () {
 
-                            color:
-                                Colors.black54,
+  Navigator.push(
 
-                            shape:
-                                BoxShape.circle,
+    context,
 
-                          ),
+    MaterialPageRoute(
+
+      builder: (_) =>
+          EditLotteryScreen(
+            lottery: lottery,
+          ),
+
+    ),
+
+  );
+
+},
+
+        onDelete: () {
+
+  showDialog(
+
+    context: context,
+
+    builder: (context){
+
+      return AlertDialog(
+
+        title:
+            const Text(
+              "Delete Lottery?"
+            ),
 
 
-                      child:
-                          const Icon(
-                            Icons.person,
-                            color:Colors.white,
-                          ),
+        content:
+            lottery.ticketsSold > 0
 
-                    ),
+            ?
 
+            const Text(
+              "Tickets have already been purchased. You cannot delete this lottery."
+            )
+
+            :
+
+            const Text(
+              "Are you sure you want to delete this lottery?"
+            ),
+
+
+
+        actions:[
+
+
+          TextButton(
+
+            onPressed:(){
+
+              Navigator.pop(context);
+
+            },
+
+            child:
+              const Text("Cancel"),
+
+          ),
+
+
+
+          if(lottery.ticketsSold == 0)
+
+          TextButton(
+
+            onPressed:() async {
+
+
+              await FirebaseFirestore.instance
+
+                  .collection("lotteries")
+
+                  .doc(lottery.id)
+
+                  .delete();
+
+
+
+              Navigator.pop(context);
+
+
+            },
+
+
+            child:
+              const Text(
+                "Delete",
+                style:
+                  TextStyle(
+                    color:Colors.red,
                   ),
+              ),
 
+          )
+
+        ],
+
+      );
+
+    },
+
+  );
+
+},
+
+        )
+
+      :
+
+      Container(
+
+        padding:
+            const EdgeInsets.all(8),
+
+        decoration:
+            const BoxDecoration(
+
+              color: Colors.black54,
+
+              shape: BoxShape.circle,
+
+            ),
+
+        child:
+            const Icon(
+              Icons.person,
+              color: Colors.white,
+            ),
+
+      ),
+
+),
+                 
 
                 ],
 
@@ -284,21 +408,13 @@ class _LotteryCardState extends State<LotteryCard> {
               children:[
 
 
-                Text(
-
-                  lottery.title,
-
-                  style:
-                    const TextStyle(
-
-                      fontSize:22,
-
-                      fontWeight:
-                          FontWeight.bold,
-
-                    ),
-
-                ),
+              Text(
+  lottery.title,
+  style: const TextStyle(
+    fontSize: 18,
+    fontWeight: FontWeight.bold,
+  ),
+),
 
 
                 const SizedBox(height:8),

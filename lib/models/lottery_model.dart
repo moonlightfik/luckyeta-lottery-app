@@ -1,36 +1,50 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+
 class Lottery {
+
   final String id;
 
+
   final String title;
+  final String description;
   final String? imageUrl;
+
 
   final double jackpot;
   final double pricePerTicket;
+
 
   final int totalTickets;
   final int ticketsSold;
   final int maxTicketsPerUser;
 
+
   final String drawFrequency;
   final bool isPublic;
 
+
   final DateTime nextDrawAt;
 
+
   final String status;
+
 
   final String creatorId;
   final String creatorName;
   final DateTime createdAt;
 
 
+
   // HOME CARD DISPLAY
+
   final double progress;
   final int themeColor;
 
 
-  // DRAWING SYSTEM
+
+  // DRAW SYSTEM
+
   final int numberOfWinners;
   final List<String> winnerIds;
   final DateTime? drawCompletedAt;
@@ -41,22 +55,30 @@ class Lottery {
 
     required this.id,
 
+
     required this.title,
+    required this.description,
     this.imageUrl,
+
 
     required this.jackpot,
     required this.pricePerTicket,
+
 
     required this.totalTickets,
     required this.ticketsSold,
     required this.maxTicketsPerUser,
 
+
     required this.drawFrequency,
     required this.isPublic,
 
+
     required this.nextDrawAt,
 
+
     this.status = 'ACTIVE',
+
 
     required this.creatorId,
     required this.creatorName,
@@ -69,25 +91,32 @@ class Lottery {
 
     required this.numberOfWinners,
     required this.winnerIds,
+
     this.drawCompletedAt,
 
   });
 
 
 
-  // FIRESTORE → APP
+
+
+  // FIRESTORE -> APP
 
   factory Lottery.fromFirestore(
-      String id,
-      Map<String, dynamic> data,
-      ) {
 
+      String id,
+
+      Map<String,dynamic> data,
+
+  ){
 
     final Timestamp? nextDrawTs =
         data['nextDrawAt'];
 
+
     final Timestamp? createdTs =
         data['createdAt'];
+
 
     final Timestamp? completedTs =
         data['drawCompletedAt'];
@@ -97,14 +126,18 @@ class Lottery {
     final int sold =
         data['ticketsSold'] ?? 0;
 
+
     final int total =
         data['totalTickets'] ?? 0;
 
 
 
+
     return Lottery(
 
-      id: id,
+
+      id:id,
+
 
 
       title:
@@ -112,22 +145,31 @@ class Lottery {
           'Untitled Lottery',
 
 
+
+      description:
+          data['description'] ??
+          '',
+
+
+
       imageUrl:
           data['imageUrl'],
+
 
 
 
       jackpot:
           (data['jackpot'] as num?)
               ?.toDouble() ??
-          0.0,
+          0,
 
 
 
       pricePerTicket:
           (data['pricePerTicket'] as num?)
               ?.toDouble() ??
-          0.0,
+          0,
+
 
 
 
@@ -142,92 +184,119 @@ class Lottery {
 
 
       maxTicketsPerUser:
-          data['maxTicketsPerUser']
-              ?? 1,
+          data['maxTicketsPerUser'] ??
+          1,
+
 
 
 
       drawFrequency:
-          data['drawFrequency']
-              ?? 'Unknown',
+          data['drawFrequency'] ??
+          'Unknown',
 
 
 
       isPublic:
-          data['isPublic']
-              ?? true,
+          data['isPublic'] ??
+          true,
+
 
 
 
       nextDrawAt:
+
           nextDrawTs != null
-              ? nextDrawTs.toDate()
-              : DateTime.now(),
+
+          ? nextDrawTs.toDate()
+
+          : DateTime.now(),
+
+
 
 
 
       status:
-          data['status']
-              ?? 'ACTIVE',
+          data['status'] ??
+          'ACTIVE',
+
+
 
 
 
       creatorId:
-          data['creatorId']
-              ?? '',
+          data['creatorId'] ??
+          '',
+
 
 
 
       creatorName:
-          data['creatorName']
-              ?? 'Unknown Creator',
+          data['creatorName'] ??
+          'Unknown Creator',
+
+
 
 
 
       createdAt:
+
           createdTs != null
-              ? createdTs.toDate()
-              : DateTime.now(),
+
+          ? createdTs.toDate()
+
+          : DateTime.now(),
 
 
 
-      // CARD DATA
+
 
       progress:
-          data['progress'] != null
-              ? (data['progress'] as num)
-                  .toDouble()
-              : total > 0
-                  ? sold / total
-                  : 0.0,
+
+          total > 0
+
+          ? sold / total
+
+          : 0,
+
+
 
 
 
       themeColor:
-          data['themeColor']
-              ?? 0xFF4CAF50,
+
+          data['themeColor'] ??
+          0xFF4CAF50,
 
 
 
-      // DRAW DATA
+
 
       numberOfWinners:
-          data['numberOfWinners']
-              ?? 1,
+
+          data['numberOfWinners'] ??
+          1,
+
+
 
 
 
       winnerIds:
+
           List<String>.from(
             data['winnerIds'] ?? [],
           ),
 
 
 
+
+
       drawCompletedAt:
+
           completedTs != null
-              ? completedTs.toDate()
-              : null,
+
+          ? completedTs.toDate()
+
+          : null,
 
     );
 
@@ -237,65 +306,87 @@ class Lottery {
 
 
 
-  // APP → FIRESTORE
 
-  Map<String, dynamic> toMap(
+
+  // APP -> FIRESTORE
+
+
+  Map<String,dynamic> toMap(
+
       String userId,
-      ) {
 
+  ){
 
     return {
 
+
       'title':
           title,
+
+
+      'description':
+          description,
+
 
 
       'imageUrl':
           imageUrl,
 
 
+
       'jackpot':
           jackpot,
+
 
 
       'pricePerTicket':
           pricePerTicket,
 
 
+
       'totalTickets':
           totalTickets,
+
 
 
       'ticketsSold':
           ticketsSold,
 
 
+
       'maxTicketsPerUser':
           maxTicketsPerUser,
+
 
 
       'drawFrequency':
           drawFrequency,
 
 
+
       'isPublic':
           isPublic,
+
 
 
       'nextDrawAt':
           nextDrawAt,
 
 
+
       'status':
           status,
+
 
 
       'creatorId':
           userId,
 
 
+
       'creatorName':
           creatorName,
+
 
 
       'createdAt':
@@ -303,10 +394,9 @@ class Lottery {
 
 
 
-      // CARD DISPLAY
-
       'progress':
           progress,
+
 
 
       'themeColor':
@@ -314,14 +404,14 @@ class Lottery {
 
 
 
-      // DRAW SYSTEM
-
       'numberOfWinners':
           numberOfWinners,
 
 
+
       'winnerIds':
           winnerIds,
+
 
 
       'drawCompletedAt':
@@ -330,4 +420,5 @@ class Lottery {
     };
 
   }
+
 }
