@@ -20,6 +20,11 @@ class Lottery {
   final int maxTicketsPerUser;
 
 
+  final String category;
+  final String cardStyle;
+  final String lotteryType;
+
+
   final String drawFrequency;
   final bool isPublic;
 
@@ -51,6 +56,7 @@ class Lottery {
 
 
 
+
   Lottery({
 
     required this.id,
@@ -70,6 +76,11 @@ class Lottery {
     required this.maxTicketsPerUser,
 
 
+    required this.category,
+    required this.cardStyle,
+    required this.lotteryType,
+
+
     required this.drawFrequency,
     required this.isPublic,
 
@@ -77,7 +88,7 @@ class Lottery {
     required this.nextDrawAt,
 
 
-    this.status = 'ACTIVE',
+    this.status = "ACTIVE",
 
 
     required this.creatorId,
@@ -92,6 +103,7 @@ class Lottery {
     required this.numberOfWinners,
     required this.winnerIds,
 
+
     this.drawCompletedAt,
 
   });
@@ -100,7 +112,6 @@ class Lottery {
 
 
 
-  // FIRESTORE -> APP
 
   factory Lottery.fromFirestore(
 
@@ -110,15 +121,15 @@ class Lottery {
 
   ){
 
-    final Timestamp? nextDrawTs =
+    final Timestamp? nextDraw =
         data['nextDrawAt'];
 
 
-    final Timestamp? createdTs =
+    final Timestamp? created =
         data['createdAt'];
 
 
-    final Timestamp? completedTs =
+    final Timestamp? completed =
         data['drawCompletedAt'];
 
 
@@ -133,6 +144,7 @@ class Lottery {
 
 
 
+
     return Lottery(
 
 
@@ -141,7 +153,7 @@ class Lottery {
 
 
       title:
-          data['title'] ??
+          data['title'] ?? 
           'Untitled Lottery',
 
 
@@ -190,6 +202,27 @@ class Lottery {
 
 
 
+
+      category:
+          data['category'] ??
+          'Cash',
+
+
+
+      cardStyle:
+          data['cardStyle'] ??
+          'Modern',
+
+
+
+      lotteryType:
+          data['lotteryType'] ??
+          'oneTime',
+
+
+
+
+
       drawFrequency:
           data['drawFrequency'] ??
           'Unknown',
@@ -203,11 +236,12 @@ class Lottery {
 
 
 
+
       nextDrawAt:
 
-          nextDrawTs != null
+          nextDraw != null
 
-          ? nextDrawTs.toDate()
+          ? nextDraw.toDate()
 
           : DateTime.now(),
 
@@ -229,7 +263,6 @@ class Lottery {
 
 
 
-
       creatorName:
           data['creatorName'] ??
           'Unknown Creator',
@@ -240,11 +273,12 @@ class Lottery {
 
       createdAt:
 
-          createdTs != null
+          created != null
 
-          ? createdTs.toDate()
+          ? created.toDate()
 
           : DateTime.now(),
+
 
 
 
@@ -262,10 +296,13 @@ class Lottery {
 
 
 
+
       themeColor:
 
           data['themeColor'] ??
-          0xFF4CAF50,
+          0xFF16A34A,
+
+
 
 
 
@@ -275,6 +312,7 @@ class Lottery {
 
           data['numberOfWinners'] ??
           1,
+
 
 
 
@@ -290,13 +328,15 @@ class Lottery {
 
 
 
+
       drawCompletedAt:
 
-          completedTs != null
+          completed != null
 
-          ? completedTs.toDate()
+          ? completed.toDate()
 
           : null,
+
 
     );
 
@@ -305,10 +345,6 @@ class Lottery {
 
 
 
-
-
-
-  // APP -> FIRESTORE
 
 
   Map<String,dynamic> toMap(
@@ -320,102 +356,120 @@ class Lottery {
     return {
 
 
-      'title':
+      "title":
           title,
 
 
-      'description':
+      "description":
           description,
 
 
 
-      'imageUrl':
+      "imageUrl":
           imageUrl,
 
 
 
-      'jackpot':
+      "jackpot":
           jackpot,
 
 
 
-      'pricePerTicket':
+      "pricePerTicket":
           pricePerTicket,
 
 
 
-      'totalTickets':
+      "totalTickets":
           totalTickets,
 
 
 
-      'ticketsSold':
+      "ticketsSold":
           ticketsSold,
 
 
 
-      'maxTicketsPerUser':
+      "maxTicketsPerUser":
           maxTicketsPerUser,
 
 
 
-      'drawFrequency':
+
+      "category":
+          category,
+
+
+
+      "cardStyle":
+          cardStyle,
+
+
+
+      "lotteryType":
+          lotteryType,
+
+
+
+
+      "drawFrequency":
           drawFrequency,
 
 
 
-      'isPublic':
+      "isPublic":
           isPublic,
 
 
 
-      'nextDrawAt':
+      "nextDrawAt":
           nextDrawAt,
 
 
 
-      'status':
+      "status":
           status,
 
 
 
-      'creatorId':
+      "creatorId":
           userId,
 
 
 
-      'creatorName':
+      "creatorName":
           creatorName,
 
 
 
-      'createdAt':
+      "createdAt":
           createdAt,
 
 
 
-      'progress':
+      "progress":
           progress,
 
 
 
-      'themeColor':
+      "themeColor":
           themeColor,
 
 
 
-      'numberOfWinners':
+      "numberOfWinners":
           numberOfWinners,
 
 
 
-      'winnerIds':
+      "winnerIds":
           winnerIds,
 
 
 
-      'drawCompletedAt':
+      "drawCompletedAt":
           drawCompletedAt,
+
 
     };
 
