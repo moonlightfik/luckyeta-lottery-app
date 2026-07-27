@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
 import 'widgets/lottery_card.dart';
 import 'widgets/my_luck_preview.dart';
 import '../notifications/notification_screen.dart';
@@ -37,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   final LotteryDrawService _drawService =
       LotteryDrawService();
-
+Timer? _drawCheckerTimer;
 
   late String username;
 
@@ -47,6 +47,16 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
 
     super.initState();
+    _drawCheckerTimer = Timer.periodic(
+  const Duration(seconds: 30),
+  (_) async {
+    try {
+      await LotteryDrawService().checkAndDrawLotteries();
+    } catch (e) {
+      debugPrint("Draw checker error: $e");
+    }
+  },
+);
 
     username =
         user?.displayName ?? "Player";
@@ -648,5 +658,9 @@ class _HomeScreenState extends State<HomeScreen> {
     );
 
   }
-
+@override
+void dispose() {
+  _drawCheckerTimer?.cancel();
+  super.dispose();
+}
 }
