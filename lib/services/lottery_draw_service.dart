@@ -1,10 +1,13 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../services/notification_service.dart';
 
 class LotteryDrawService {
   final FirebaseFirestore _firestore =
       FirebaseFirestore.instance;
+      final NotificationService _notificationService =
+    NotificationService();
 
   final Random _random = Random();
 
@@ -209,24 +212,55 @@ class LotteryDrawService {
 
     }
 
-    //==============================
-    // Notification hooks
-    //==============================
+   //==============================
+// Send Notifications
+//==============================
 
-    // Creator
-    //
-    // await NotificationService()
-    //     .notifyCreatorLotteryFinished(...);
+// Notify creator
 
-    // Winners
-    //
-    // await NotificationService()
-    //     .notifyWinner(...);
+await _notificationService.notifyDrawCompleted(
+  creatorId: lotteryData["creatorId"],
+  creatorName: lotteryData["creatorName"],
+  lotteryId: lotteryId,
+  lotteryTitle: lotteryData["title"],
+);
+for (final winnerId in winnerIds) {
 
-    // Losers
-    //
-    // await NotificationService()
-    //     .notifyLosers(...);
+  await _notificationService.notifyWinner(
+
+    userId: winnerId,
+
+    lotteryId: lotteryId,
+
+    lotteryTitle: lotteryData["title"],
+
+  );}
+  final losers = await _firestore
+    .collectionGroup("tickets")
+    .where(
+      "lotteryID",
+      isEqualTo: lotteryId,
+    )
+    .where(
+      "status",
+      isEqualTo: "LOST",
+    )
+    .get();
+
+
+for (final loser in losers.docs) {
+
+  await _notificationService.notifyLoser(
+
+    userId: loser["userId"],
+
+    lotteryId: lotteryId,
+
+    lotteryTitle: lotteryData["title"],
+
+  );
+
+}
   }
 
   //==============================

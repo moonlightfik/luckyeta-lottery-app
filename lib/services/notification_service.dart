@@ -65,17 +65,16 @@ class NotificationService {
   }
 
   /// Winner notification
-  Future<void> notifyWinner({
-    required String userId,
-    required String userName,
-    required String lotteryId,
-    required String lotteryTitle,
-  }) async {
+ Future<void> notifyWinner({
+  required String userId,
+  required String lotteryId,
+  required String lotteryTitle,
+}) async {
     await sendNotification(
       userId: userId,
       title: "🎉 Congratulations!",
       message:
-          "Hi $userName,\n\nYou won \"$lotteryTitle\"!\n\nTap here to claim your prize.",
+    "Congratulations!\n\nYou won \"$lotteryTitle\"!\n\nTap here to claim your prize.",
       type: "winner",
       lotteryId: lotteryId,
       action: "claim_prize",
@@ -84,16 +83,15 @@ class NotificationService {
 
   /// Loser notification
   Future<void> notifyLoser({
-    required String userId,
-    required String userName,
-    required String lotteryId,
-    required String lotteryTitle,
-  }) async {
+  required String userId,
+  required String lotteryId,
+  required String lotteryTitle,
+}) async {
     await sendNotification(
       userId: userId,
       title: "🍀 Better Luck Next Time",
       message:
-          "Hi $userName,\n\nThe draw for \"$lotteryTitle\" has ended.\n\nUnfortunately your ticket wasn't selected this time.\n\nTry again—you might be the next winner!",
+    "The draw for \"$lotteryTitle\" has ended.\n\nUnfortunately your ticket wasn't selected this time.\n\nBetter luck next time!",
       type: "loser",
       lotteryId: lotteryId,
       action: "buy_again",
