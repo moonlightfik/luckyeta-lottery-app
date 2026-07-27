@@ -185,7 +185,15 @@ class LotteryDrawService {
 
     final bool recurring =
         lotteryData["lotteryType"] == "recurring";
-
+        await saveDrawHistory(
+  lotteryId: lotteryId,
+  lotteryData: lotteryData,
+  winnerIds: winnerIds,
+  winningTickets: winningNumbers,
+);
+await archiveOldTickets(
+  lotteryId: lotteryId,
+);
     if (recurring) {
 
       await resetRecurringLottery(
@@ -298,15 +306,7 @@ for (final loser in losers.docs) {
     await lotteryRef.update({
 
       // Save previous draw
-
-      "winnerIds": winnerIds,
-
-      "winningTickets": winningNumbers,
-
-      "drawCompletedAt":
-          FieldValue.serverTimestamp(),
-
-      // Reset lottery
+     // Reset lottery
 
       "ticketsSold": 0,
 
@@ -408,5 +408,67 @@ for (final loser in losers.docs) {
     });
 
   }
+Future<void> archiveOldTickets({
+  required String lotteryId,
+}) async {
 
+  final tickets = await _firestore
+      .collectionGroup("tickets")
+      .where(
+        "lotteryID",
+        isEqualTo: lotteryId,
+      )
+      .where(
+        "status",
+        whereIn: [
+          "WON",
+          "LOST",
+        ],
+      )
+      .get();
+
+
+  final batch =
+      _firestore.batch();
+
+
+  for(final ticket in tickets.docs){
+
+    final data = ticket.data();
+
+
+    final userId =
+        data["userId"];
+
+
+    final historyRef =
+        _firestore
+            .collection("users")
+            .doc(userId)
+            .collection("ticketHistory")
+            .doc(ticket.id);
+
+
+
+    batch.set(
+      historyRef,
+      {
+        ...data,
+
+        "archivedAt":
+            FieldValue.serverTimestamp(),
+      },
+    );
+
+
+    batch.delete(
+      ticket.reference,
+    );
+
+  }
+
+
+  await batch.commit();
+
+}
 }
