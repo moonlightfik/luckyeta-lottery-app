@@ -31,7 +31,7 @@ class _BottomNavScreenState extends State<BottomNavScreen> {
   Widget build(BuildContext context) {
     final tabs = [
       const HomeScreen(),
-      ExploreScreen(userName: username),
+      const ExploreScreen(),
       const MyLotteriesScreen(),
       const ProfilePage(), // ✅ FIXED
     ];

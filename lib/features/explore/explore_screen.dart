@@ -1,227 +1,396 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+
 import '../../models/lottery_model.dart';
-import '../buy_ticket/buy_ticket_screen.dart';
-import '../../navigation/bottom_nav_screen.dart';
+import '../profile/profile_screen.dart';
+import 'widgets/explore_lottery_card.dart';
 
 class ExploreScreen extends StatefulWidget {
-  final String userName;
-  const ExploreScreen({super.key, required this.userName});
+  const ExploreScreen({super.key});
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
 }
 
 class _ExploreScreenState extends State<ExploreScreen> {
-  int _selectedCategory = 0;
-  Duration _countdown = const Duration(hours: 4, minutes: 22, seconds: 10);
-  late Timer _timer;
-
-  final List<String> categories = [
-    'All Games',
-    'High Prizes',
-    'Daily Draw',
-    'Exclusive',
-  ];
+  final TextEditingController searchController = TextEditingController();
+  final FirebaseFirestore firestore = FirebaseFirestore.instance;
+  final FirebaseAuth auth = FirebaseAuth.instance;
+  
+  String searchText = "";
+  String selectedType = "All";
+  String selectedCategory = "All";
+  List<String> categories = ["All"];
+  
+  String? _profileImageUrl;
+  bool _isLoadingImage = false;
 
   @override
   void initState() {
     super.initState();
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_countdown.inSeconds > 0) {
-        setState(() {
-          _countdown -= const Duration(seconds: 1);
-        });
-      } else {
-        timer.cancel();
-      }
+    loadCategories();
+    _loadProfileImage();
+
+    searchController.addListener(() {
+      setState(() {
+        searchText = searchController.text.trim().toLowerCase();
+      });
     });
   }
 
   @override
   void dispose() {
-    _timer.cancel();
+    searchController.dispose();
     super.dispose();
   }
 
-  String formatDuration(Duration d) {
-    String twoDigits(int n) => n.toString().padLeft(2, '0');
-    return "${twoDigits(d.inHours)}:${twoDigits(d.inMinutes.remainder(60))}:${twoDigits(d.inSeconds.remainder(60))}";
+  //==============================
+  // LOAD PROFILE IMAGE
+  //==============================
+  Future<void> _loadProfileImage() async {
+    final user = auth.currentUser;
+    if (user == null) return;
+
+    setState(() => _isLoadingImage = true);
+
+    try {
+      final doc = await firestore
+          .collection('users')
+          .doc(user.uid)
+          .get();
+      
+      if (doc.exists && doc.data()?['profileImageUrl'] != null) {
+        setState(() {
+          _profileImageUrl = doc.data()?['profileImageUrl'];
+        });
+      }
+    } catch (e) {
+      print('Error loading profile image: $e');
+    }
+
+    setState(() => _isLoadingImage = false);
   }
 
+  //==============================
+  // LOAD CATEGORIES
+  //==============================
+  Future<void> loadCategories() async {
+    final snapshot = await firestore
+        .collection("lotteries")
+        .where("isPublic", isEqualTo: true)
+        .get();
+
+    final Set<String> unique = {"All"};
+
+    for (final doc in snapshot.docs) {
+      final category = doc["category"];
+      if (category != null && category.toString().isNotEmpty) {
+        unique.add(category);
+      }
+    }
+
+    setState(() {
+      categories = unique.toList();
+    });
+  }
+
+  //==============================
+  // FILTER METHODS
+  //==============================
+  bool matchesType(Lottery lottery, String type) {
+    if (type == "All") return true;
+    if (type == "One Time") return lottery.lotteryType == "oneTime";
+    if (type == "Daily") return lottery.drawFrequency == "Daily";
+    if (type == "Weekly") return lottery.drawFrequency == "Weekly";
+    return true;
+  }
+
+  bool matchesCategory(Lottery lottery, String category) {
+    if (category == "All") return true;
+    return lottery.category == category;
+  }
+
+  bool matchesSearch(Lottery lottery, String text) {
+    if (text.isEmpty) return true;
+    return lottery.title.toLowerCase().contains(text) ||
+        lottery.creatorName.toLowerCase().contains(text) ||
+        lottery.category.toLowerCase().contains(text) ||
+        lottery.description.toLowerCase().contains(text);
+  }
+
+  //==============================
+  // LOTTERIES STREAM
+  //==============================
+  Stream<List<Lottery>> get lotteries {
+    return firestore
+        .collection("lotteries")
+        .where("isPublic", isEqualTo: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) {
+        return Lottery.fromFirestore(doc.id, doc.data());
+      }).toList();
+    });
+  }
+
+  //==============================
+  // BUILD
+  //==============================
   @override
   Widget build(BuildContext context) {
+    
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7F8),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Header
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text(
-                    'Explore Lotteries',
-                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+        child: Column(
+          children: [
+            //==========================
+            // HEADER
+            //==========================
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          "Explore",
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          "Find lotteries waiting for you",
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  CircleAvatar(
-                    radius: 25,
-                    backgroundImage: AssetImage('assets/avatar.png'),
+                  
+                  //==========================
+                  // AVATAR - Navigates to Profile
+                  //==========================
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ProfilePage(),
+                        ),
+                      );
+                    },
+                    child: _profileImageUrl != null
+                        ? CircleAvatar(
+                            radius: 24,
+                            backgroundImage: NetworkImage(_profileImageUrl!),
+                            backgroundColor: Colors.transparent,
+                            onBackgroundImageError: (_, __) {
+                              setState(() {
+                                _profileImageUrl = null;
+                              });
+                            },
+                          )
+                        : Container(
+                            width: 48,
+                            height: 48,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.transparent,
+                            ),
+                            child: _isLoadingImage
+                                ? const CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: Colors.green,
+                                  )
+                                : Icon(
+                                    Icons.person_outline,
+                                    size: 32,
+                                    color: Colors.grey.shade400,
+                                  ),
+                          ),
                   ),
                 ],
               ),
+            ),
 
-              const SizedBox(height: 16),
-
-              // Search
-              TextField(
+            //==========================
+            // SEARCH BAR
+            //==========================
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: TextField(
+                controller: searchController,
                 decoration: InputDecoration(
-                  hintText: 'Search for lotteries...',
-                  filled: true,
-                  fillColor: Colors.grey.shade200,
+                  hintText: "Search lotteries...",
                   prefixIcon: const Icon(Icons.search),
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 14),
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(18),
                     borderSide: BorderSide.none,
                   ),
                 ),
               ),
+            ),
 
-              const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
-              // Categories
-              SizedBox(
-                height: 40,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: categories.length,
-                  itemBuilder: (_, index) {
-                    final selected = _selectedCategory == index;
-                    return GestureDetector(
-                      onTap: () => setState(() => _selectedCategory = index),
-                      child: Container(
-                        margin: const EdgeInsets.only(right: 12),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        decoration: BoxDecoration(
-                          color: selected ? Colors.green : Colors.grey.shade200,
-                          borderRadius: BorderRadius.circular(20),
+            //==========================
+            // LOTTERY TYPE FILTER
+            //==========================
+            SizedBox(
+              height: 45,
+              child: ListView(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                children: [
+                  "All",
+                  "One Time",
+                  "Daily",
+                  "Weekly",
+                ].map(
+                  (type) {
+                    final selected = selectedType == type;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 10),
+                      child: ChoiceChip(
+                        label: Text(type),
+                        selected: selected,
+                        selectedColor: Colors.green,
+                        labelStyle: TextStyle(
+                          color: selected ? Colors.white : Colors.black,
+                          fontWeight: FontWeight.w600,
                         ),
-                        alignment: Alignment.center,
-                        child: Text(
-                          categories[index],
-                          style: TextStyle(
-                            color: selected ? Colors.white : Colors.black,
-                          ),
-                        ),
+                        onSelected: (_) {
+                          setState(() {
+                            selectedType = type;
+                          });
+                        },
                       ),
                     );
                   },
-                ),
+                ).toList(),
               ),
+            ),
 
-              const SizedBox(height: 20),
+            const SizedBox(height: 18),
 
-              // Featured Jackpots
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    'Featured Jackpots',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) =>
-                              const BottomNavScreen(initialIndex: 1),
-                        ),
+            //==========================
+            // CATEGORY FILTER
+            //==========================
+            SizedBox(
+              height: 45,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                itemCount: categories.length,
+                itemBuilder: (context, index) {
+                  final category = categories[index];
+                  final selected = selectedCategory == category;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 10),
+                    child: ChoiceChip(
+                      label: Text(category),
+                      selected: selected,
+                      selectedColor: Colors.green,
+                      labelStyle: TextStyle(
+                        color: selected ? Colors.white : Colors.black,
+                      ),
+                      onSelected: (_) {
+                        setState(() {
+                          selectedCategory = category;
+                        });
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(height: 15),
+
+            //==========================
+            // LOTTERY LIST
+            //==========================
+            Expanded(
+              child: StreamBuilder<List<Lottery>>(
+                stream: lotteries,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                      child: Text("No lotteries found."),
+                    );
+                  }
+
+                  List<Lottery> filtered = snapshot.data!
+                      .where(
+                        (lottery) =>
+                            matchesSearch(lottery, searchText) &&
+                            matchesType(lottery, selectedType) &&
+                            matchesCategory(lottery, selectedCategory),
+                      )
+                      .toList();
+
+                  if (filtered.isEmpty) {
+                    return const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.search_off,
+                            size: 70,
+                            color: Colors.grey,
+                          ),
+                          SizedBox(height: 15),
+                          Text(
+                            "No matching lotteries found.",
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  return GridView.builder(
+                    padding: const EdgeInsets.all(20),
+                    itemCount: filtered.length,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                      childAspectRatio: .60,
+                    ),
+                    itemBuilder: (context, index) {
+                      final lottery = filtered[index];
+                      return ExploreLotteryCard(
+                        lottery: lottery,
                       );
                     },
-                    child: const Text('View All',
-                        style: TextStyle(color: Colors.green)),
-                  ),
-                ],
+                  );
+                },
               ),
-
-              const SizedBox(height: 12),
-
-              SizedBox(
-                height: 180,
-                child: StreamBuilder<QuerySnapshot>(
-                  stream: FirebaseFirestore.instance
-                      .collection('lotteries')
-                      .snapshots(),
-                  builder: (context, snapshot) {
-                    if (!snapshot.hasData) {
-                      return const Center(
-                          child: CircularProgressIndicator());
-                    }
-
-                    final lotteries = snapshot.data!.docs
-                        .map(
-                          (doc) => Lottery.fromFirestore(
-                            doc.id,
-                            doc.data() as Map<String, dynamic>,
-                          ),
-                        )
-                        .toList();
-
-                    return ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: lotteries.length,
-                      itemBuilder: (context, index) {
-                        final lottery = lotteries[index];
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) =>
-                                    BuyTicketScreen(lottery: lottery),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            width: 250,
-                            margin: const EdgeInsets.only(right: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey.shade300,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.end,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  lottery.title,
-                                  style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Prize: \$${lottery.jackpot}',
-                                  style: const TextStyle(
-                                      color: Colors.green,
-                                      fontWeight: FontWeight.bold),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
