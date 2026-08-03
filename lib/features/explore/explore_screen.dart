@@ -2,13 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
-
 import '../../models/lottery_model.dart';
-import '../profile/profile_screen.dart';
 import 'widgets/explore_lottery_card.dart';
 
 class ExploreScreen extends StatefulWidget {
-  const ExploreScreen({super.key});
+  final VoidCallback? onProfileTap; // ← Added this callback
+  
+  const ExploreScreen({super.key, this.onProfileTap});
 
   @override
   State<ExploreScreen> createState() => _ExploreScreenState();
@@ -140,8 +140,6 @@ class _ExploreScreenState extends State<ExploreScreen> {
   //==============================
   @override
   Widget build(BuildContext context) {
-    
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7F8),
       body: SafeArea(
@@ -178,17 +176,10 @@ class _ExploreScreenState extends State<ExploreScreen> {
                   ),
                   
                   //==========================
-                  // AVATAR - Navigates to Profile
+                  // AVATAR - Navigates to Profile using Callback
                   //==========================
                   GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const ProfilePage(),
-                        ),
-                      );
-                    },
+                    onTap: widget.onProfileTap, // ← Use callback instead of Navigator.push
                     child: _profileImageUrl != null
                         ? CircleAvatar(
                             radius: 24,

@@ -1,7 +1,7 @@
 const {setGlobalOptions} = require("firebase-functions");
 const {onSchedule} = require("firebase-functions/v2/scheduler");
 const admin = require("firebase-admin");
-
+const { drawLottery } = require("./drawLottery");
 admin.initializeApp();
 
 const db = admin.firestore();
@@ -19,7 +19,6 @@ exports.drawLotteries = onSchedule(
 
     const now = admin.firestore.Timestamp.now();
 
-
     const lotteriesSnapshot =
       await db
         .collection("lotteries")
@@ -27,251 +26,36 @@ exports.drawLotteries = onSchedule(
         .where("nextDrawAt", "<=", now)
         .get();
 
-
-
     if (lotteriesSnapshot.empty) {
-      console.log("No lotteries ready for drawing");
+
+      console.log("No lotteries ready.");
+
       return;
+
     }
-
-
 
     for (const lotteryDoc of lotteriesSnapshot.docs) {
 
-
-      const lottery =
-          lotteryDoc.data();
-
-
-
-      const lotteryId =
-          lotteryDoc.id;
-
-
-
-      console.log(
-        "Drawing lottery:",
-        lotteryId
-      );
-
-
-
-      const winnersNeeded =
-          lottery.numberOfWinners || 1;
-
-
-
-      // GET ALL TICKETS
-
-      const ticketsSnapshot =
-          await db
-            .collectionGroup("tickets")
-            .where(
-              "lotteryID",
-              "==",
-              lotteryId
-            )
-            .where(
-              "status",
-              "==",
-              "ACTIVE"
-            )
-            .get();
-
-
-
-      if (ticketsSnapshot.empty) {
+      try {
 
         console.log(
-          "No tickets found"
+          "Drawing:",
+          lotteryDoc.id,
         );
 
-        continue;
-      }
-
-
-
-      let tickets = [];
-
-
-
-      ticketsSnapshot.forEach((doc)=>{
-
-        tickets.push({
-
-          id: doc.id,
-
-          ref: doc.ref,
-
-          userId:
-            doc.data().userId,
-
-          ticketNumber:
-            doc.data().ticketNumber,
-
-        });
-
-      });
-
-
-
-      // SHUFFLE RANDOMLY
-
-      tickets.sort(
-        () => Math.random() - 0.5
-      );
-
-
-
-      let winners = [];
-
-      let usedUsers = new Set();
-
-
-
-      for (const ticket of tickets) {
-
-
-        // ONE WIN PER USER
-
-        if(
-          usedUsers.has(
-            ticket.userId
-          )
-        ){
-
-          continue;
-
-        }
-
-
-
-        winners.push(ticket);
-
-
-        usedUsers.add(
-          ticket.userId
+        await drawLottery(
+          lotteryDoc.id,
         );
 
+      } catch (e) {
 
-
-        if(
-          winners.length >= winnersNeeded
-        ){
-
-          break;
-
-        }
-
-      }
-
-
-
-      if(
-        winners.length === 0
-      ){
-
-        continue;
-
-      }
-
-
-
-      const batch =
-          db.batch();
-
-
-
-      let winnerIds = [];
-
-
-
-      // UPDATE WINNERS
-
-      for(
-        const winner of winners
-      ){
-
-        batch.update(
-          winner.ref,
-          {
-
-            status:"WON",
-
-            wonAt:
-              admin.firestore.FieldValue.serverTimestamp()
-
-          }
-        );
-
-
-        winnerIds.push(
-          winner.userId
+        console.error(
+          "Draw failed:",
+          lotteryDoc.id,
+          e,
         );
 
       }
-
-
-
-      // UPDATE LOSERS
-
-      for(
-        const ticket of tickets
-      ){
-
-        if(
-          !winnerIds.includes(
-            ticket.userId
-          )
-        ){
-
-          batch.update(
-            ticket.ref,
-            {
-              status:"LOST"
-            }
-          );
-
-        }
-
-      }
-
-
-
-      // UPDATE LOTTERY
-
-      batch.update(
-
-        db.collection("lotteries")
-          .doc(lotteryId),
-
-        {
-
-          status:"DRAWN",
-
-          winnerIds:
-
-            winnerIds,
-
-
-          drawCompletedAt:
-
-            admin.firestore.FieldValue.serverTimestamp()
-
-        }
-
-      );
-
-
-
-      await batch.commit();
-
-
-
-      console.log(
-        "Lottery completed:",
-        lotteryId
-      );
 
     }
 

@@ -199,7 +199,8 @@ class _LotteryFormState
   DateTime nextDrawAt =
       DateTime.now();
 
-
+TimeOfDay selectedDrawTime =
+    TimeOfDay.now();
 
 
 
@@ -404,6 +405,10 @@ class _LotteryFormState
         lottery.nextDrawAt;
 
 
+selectedDrawTime = TimeOfDay(
+  hour: lottery.nextDrawAt.hour,
+  minute: lottery.nextDrawAt.minute,
+);
 
     isPublic =
         lottery.isPublic;
@@ -421,79 +426,66 @@ class _LotteryFormState
   // DRAW CALCULATION
   //------------------------------------
 
+void calculateNextDraw() {
 
-  void calculateNextDraw(){
+  final now = DateTime.now();
 
+  final hour = selectedDrawTime.hour;
+  final minute = selectedDrawTime.minute;
 
-    final now =
-        DateTime.now();
+  if (lotteryType == "oneTime") {
 
+    nextDrawAt = DateTime(
+      now.year,
+      now.month,
+      now.day + 1,
+      hour,
+      minute,
+    );
 
+  } else {
 
-    if(lotteryType=="oneTime"){
+    switch (drawFrequency) {
 
+      case "Hourly":
 
-      nextDrawAt =
-          now.add(
-            const Duration(days:1),
-          );
+        nextDrawAt = now.add(
+          const Duration(hours: 1),
+        );
 
+        break;
 
-    }
+      case "Daily":
 
-    else{
+        nextDrawAt = DateTime(
+          now.year,
+          now.month,
+          now.day + 1,
+          hour,
+          minute,
+        );
 
+        break;
 
-      switch(drawFrequency){
+      case "Weekly":
 
+        nextDrawAt = DateTime(
+          now.year,
+          now.month,
+          now.day + 7,
+          hour,
+          minute,
+        );
 
-        case "Hourly":
-
-          nextDrawAt =
-              now.add(
-                const Duration(hours:1),
-              );
-
-          break;
-
-
-
-        case "Daily":
-
-          nextDrawAt =
-              DateTime(
-                now.year,
-                now.month,
-                now.day + 1,
-                20,
-              );
-
-          break;
-
-
-
-        case "Weekly":
-
-          nextDrawAt =
-              now.add(
-                const Duration(days:7),
-              );
-
-          break;
-
-
-
-      }
-
+        break;
 
     }
-
-
-
-    setState((){});
-
 
   }
+
+  setState(() {});
+}
+
     //------------------------------------
   // CALCULATIONS
   //------------------------------------
@@ -1659,127 +1651,116 @@ Future<void> updateLottery() async {
 
           const SizedBox(height:15),
 
+Theme(
+  data: Theme.of(context).copyWith(
+    colorScheme: const ColorScheme.light(
+      primary: Color(0xff16A34A),
+      secondary: Color(0xff16A34A),
+    ),
+  ),
+  child: SegmentedButton<String>(
+    segments: const [
 
+      ButtonSegment(
+        value: "oneTime",
+        label: Text("One Time"),
+      ),
 
+      ButtonSegment(
+        value: "Daily",
+        label: Text("Daily"),
+      ),
 
+      ButtonSegment(
+        value: "Weekly",
+        label: Text("Weekly"),
+      ),
 
-         
+    ],
 
-            SegmentedButton<String>(
+    selected: {
+      lotteryType == "oneTime"
+          ? "oneTime"
+          : drawFrequency,
+    },
 
+    style: ButtonStyle(
 
-              segments:
+      backgroundColor:
+          WidgetStateProperty.resolveWith(
+        (states) {
 
-              const [
+          if(states.contains(
+            WidgetState.selected,
+          )) {
 
+            return const Color(0xff16A34A);
 
+          }
 
-                ButtonSegment(
+          return Colors.white;
 
-                  value:
-                      "oneTime",
+        },
+      ),
 
-                  label:
-                      Text(
-                        "One Time",
-                      ),
 
-                ),
+      foregroundColor:
+          WidgetStateProperty.resolveWith(
+        (states) {
 
+          if(states.contains(
+            WidgetState.selected,
+          )) {
 
+            return Colors.white;
 
-                ButtonSegment(
+          }
 
-                  value:
-                      "Daily",
+          return Colors.black;
 
-                  label:
-                      Text(
-                        "Daily",
-                      ),
+        },
+      ),
 
-                ),
-
-
-
-                ButtonSegment(
-
-                  value:
-                      "Weekly",
-
-                  label:
-                      Text(
-                        "Weekly",
-                      ),
-
-                ),
-
-
-
-              ],
-
-
-
-              selected:{
-
-
-                lotteryType == "oneTime"
-
-                ? "oneTime"
-
-                : drawFrequency,
-
-
-              },
-
-
-
-              onSelectionChanged:(value){
-
-
-
-                setState((){
-
-
-
-                  if(value.first=="oneTime"){
-
-
-                    lotteryType =
-                        "oneTime";
-
-
-                  }
-
-                  else{
-
-
-                    lotteryType =
-                        "recurring";
-
-
-                    drawFrequency =
-                        value.first;
-
-
-
-                  }
-
-
-
-                  calculateNextDraw();
-
-
-
-                });
-
-
-              },
-
-
+      side:
+          WidgetStateProperty.all(
+            const BorderSide(
+              color: Color(0xff16A34A),
             ),
+          ),
+
+    ),
+
+
+    onSelectionChanged:(value){
+
+      setState((){
+
+        if(value.first=="oneTime"){
+
+          lotteryType = "oneTime";
+
+        } else {
+
+          lotteryType = "recurring";
+
+          drawFrequency = value.first;
+
+        }
+
+        calculateNextDraw();
+
+      });
+
+    },
+
+  ),
+),
+
+
 
          
+
+           
                     const SizedBox(height:30),
 
 
@@ -1794,84 +1775,108 @@ Future<void> updateLottery() async {
 
           if(lotteryType == "oneTime")
 
-          Card(
+         Card(
+  child: ListTile(
+    leading: const Icon(Icons.calendar_today),
+    title: Text(
+      "${nextDrawAt.day}/${nextDrawAt.month}/${nextDrawAt.year}",
+    ),
+    subtitle: const Text("Draw Date"),
+    trailing: const Icon(Icons.edit),
+    onTap: () async {
 
-            child:
-
-            ListTile(
-
-              leading:
-                  const Icon(
-                    Icons.calendar_today,
-                  ),
-
-
-
-              title:
-
-                  Text(
-
-                    "${nextDrawAt.day}/"
-                    "${nextDrawAt.month}/"
-                    "${nextDrawAt.year}",
-
-                  ),
-
-
-
-              subtitle:
-
-                  const Text(
-                    "Tap to choose draw date",
-                  ),
-
-
-
-
-              trailing:
-
-                  const Icon(
-                    Icons.edit,
-                  ),
-
-
-
-              onTap: () async {
-
-  final picked = await showDatePicker(
-    context: context,
-    initialDate: nextDrawAt,
-    firstDate: DateTime.now(),
-    lastDate: DateTime(2100),
-  );
-
-  if (picked == null) return;
-
-  setState(() {
-    nextDrawAt = DateTime(
-      picked.year,
-      picked.month,
-      picked.day,
-      nextDrawAt.hour,
-      nextDrawAt.minute,
+     final picked = await showDatePicker(
+  context: context,
+  initialDate: nextDrawAt,
+  firstDate: DateTime.now(),
+  lastDate: DateTime(2100),
+  builder: (context, child) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: Theme.of(context).colorScheme.copyWith(
+          primary: const Color(0xff16A34A),
+          onPrimary: Colors.white,
+          secondary: const Color(0xff16A34A),
+        ),
+      ),
+      child: child!,
     );
-  });
+  },
+);
 
-},
+      if (picked == null) return;
+
+      setState(() {
+
+        nextDrawAt = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          selectedDrawTime.hour,
+          selectedDrawTime.minute,
+        );
+
+      });
+
+    },
+  ),
+),
+
+const SizedBox(height:15),
+
+Card(
+  child: ListTile(
+    leading: const Icon(Icons.access_time),
+    title: Text(
+      selectedDrawTime.format(context),
+    ),
+    subtitle: const Text("Draw Time"),
+    trailing: const Icon(Icons.edit),
+    onTap: () async {
+
+      final picked = await showTimePicker(
+  context: context,
+  initialTime: selectedDrawTime,
+  builder: (context, child) {
+    return Theme(
+      data: Theme.of(context).copyWith(
+        colorScheme: const ColorScheme.light(
+          primary: Color(0xff16A34A),
+          onPrimary: Colors.white,
+          secondary: Color(0xff16A34A),
+          onSecondary: Colors.white,
+          surface: Colors.white,
+          onSurface: Colors.black,
+        ),
+      ),
+      child: child!,
+    );
+  },
+);
+
+      if (picked == null) return;
+
+      setState(() {
+
+        selectedDrawTime = picked;
+
+        nextDrawAt = DateTime(
+          nextDrawAt.year,
+          nextDrawAt.month,
+          nextDrawAt.day,
+          picked.hour,
+          picked.minute,
+        );
+
+      });
+
+    },
+  ),
+),
 
 
-            ),
 
-
-          ),
-
-
-
-
-
-
-
-          const SizedBox(height:30),
+ const SizedBox(height:30),
 
 
 
@@ -2623,12 +2628,5 @@ Future<void> updateLottery() async {
 
 
     super.dispose();
-
-
-  }
-
-
-
-
-
+ }
 }
