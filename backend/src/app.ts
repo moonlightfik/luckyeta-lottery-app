@@ -1,6 +1,6 @@
 import express from "express";
 import lotteryRoutes from "./routes/lottery.routes";
-
+import { startLotteryScheduler } from "./services/lottery.scheduler";
 const app = express();
 
 app.use(express.json());
@@ -13,10 +13,10 @@ app.get("/", (req, res) => {
 
 app.use("/lotteries", lotteryRoutes);
 
-const PORT = 3000;
+startLotteryScheduler();
 
-app.listen(PORT, () => {
+app.listen(3000, () => {
   console.log(
-    `LuckyEta backend running on http://localhost:${PORT}`,
+    "LuckyEta backend running on http://localhost:3000",
   );
 });

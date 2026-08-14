@@ -76,10 +76,13 @@ class _LotteryCardState extends State<LotteryCard> {
   // COUNTDOWN
   //----------------------------------------
 
-  void updateCountdown() {
-    final difference =
-        _lottery.nextDrawAt.difference(DateTime.now());
+ void updateCountdown() {
+  if (_lottery.nextDrawAt == null) {
+    return;
+  }
 
+  final difference =
+      _lottery.nextDrawAt!.difference(DateTime.now());
     if (!mounted) return;
 
     setState(() {
@@ -102,18 +105,19 @@ class _LotteryCardState extends State<LotteryCard> {
     }
 
     DateTime newDrawTime;
+if (_lottery.nextDrawAt == null) {
+  return;
+}
 
-    if (_lottery.drawFrequency == "Daily") {
-      newDrawTime =
-          _lottery.nextDrawAt.add(
-        const Duration(days: 1),
-      );
-    } else {
-      newDrawTime =
-          _lottery.nextDrawAt.add(
-        const Duration(days: 7),
-      );
-    }
+if (_lottery.drawFrequency == "Daily") {
+  newDrawTime = _lottery.nextDrawAt!.add(
+    const Duration(days: 1),
+  );
+} else {
+  newDrawTime = _lottery.nextDrawAt!.add(
+    const Duration(days: 7),
+  );
+}
 
     await FirebaseFirestore.instance
         .collection("lotteries")
@@ -461,14 +465,14 @@ class _LotteryCardState extends State<LotteryCard> {
 
                         const SizedBox(width: 5),
 
-                        Text(
-                          lottery.lotteryType == "oneTime"
-                              ? "One Time"
-                              : lottery.drawFrequency,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                       Text(
+  lottery.lotteryType == "oneTime"
+      ? "One Time"
+      : lottery.drawFrequency ?? "Unknown",
+  style: const TextStyle(
+    fontWeight: FontWeight.bold,
+  ),
+),
 
                       ],
                     ),

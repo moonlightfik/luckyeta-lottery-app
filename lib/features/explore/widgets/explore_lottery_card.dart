@@ -170,7 +170,7 @@ class ExploreLotteryCard extends StatelessWidget {
 
                                 ? "One Time"
 
-                                : lottery.drawFrequency,
+                                : lottery.drawFrequency ?? "Unknown",
 
                             style: const TextStyle(
                               fontSize: 12,

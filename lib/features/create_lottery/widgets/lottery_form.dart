@@ -397,17 +397,14 @@ TimeOfDay selectedDrawTime =
 
 
     drawFrequency =
-        lottery.drawFrequency;
+    lottery.drawFrequency ?? "Daily";
 
-
-
-    nextDrawAt =
-        lottery.nextDrawAt;
-
+nextDrawAt =
+    lottery.nextDrawAt ?? DateTime.now();
 
 selectedDrawTime = TimeOfDay(
-  hour: lottery.nextDrawAt.hour,
-  minute: lottery.nextDrawAt.minute,
+  hour: nextDrawAt.hour,
+  minute: nextDrawAt.minute,
 );
 
     isPublic =

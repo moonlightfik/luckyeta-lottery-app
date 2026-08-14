@@ -3,6 +3,7 @@ import {
   getAllLotteries,
   getLotteryById,
 } from "../services/lottery.service";
+import { getHomeLotteries } from "../services/lottery.service";
 
 export async function getLotteries(
   req: Request,
@@ -57,6 +58,35 @@ const lottery = await getLotteryById(id);
     return res.status(500).json({
       success: false,
       message: "Failed to fetch lottery",
+    });
+  }
+}
+export async function getHomeLotteriesController(
+  req: Request,
+  res: Response,
+) {
+  try {
+    const userId = req.query.userId;
+
+    if (typeof userId !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: "userId is required",
+      });
+    }
+
+    const lotteries = await getHomeLotteries(userId);
+
+    return res.json({
+      success: true,
+      data: lotteries,
+    });
+  } catch (error) {
+    console.error("Error getting home lotteries:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to load home lotteries",
     });
   }
 }
