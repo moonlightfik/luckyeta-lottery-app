@@ -96,27 +96,19 @@ class LotteryDetails extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
 
     final String title = lottery.title;
+    final String description = lottery.description;
+    final String status = lottery.status;
 
-    final String description =
-        lottery.description;
-
-    final String status =
-        lottery.status;
-
-    final int jackpot =
-        lottery.jackpot.toInt();
-
+    final int jackpot = lottery.jackpot.toInt();
     final int pricePerTicket =
         lottery.pricePerTicket.toInt();
 
-    final int totalTickets =
-        lottery.totalTickets;
+    final int totalTickets = lottery.totalTickets;
+    final int ticketsSold = lottery.ticketsSold;
 
-    final int ticketsSold =
-        lottery.ticketsSold;
-
+    // Calculate remaining tickets directly.
     final int remainingTickets =
-        lottery.remainingTickets;
+        (totalTickets - ticketsSold).clamp(0, totalTickets);
 
     final int maxTicketsPerUser =
         lottery.maxTicketsPerUser;
@@ -228,29 +220,8 @@ class LotteryDetails extends StatelessWidget {
                 // LOTTERY INFORMATION
                 // ==================================================
 
-                _buildExtraLotteryInfo(
+                _buildLotteryInformation(
                   lottery,
-                ),
-
-                const SizedBox(height: 16),
-
-                // ==================================================
-                // TICKET INFORMATION
-                // ==================================================
-
-                _buildInfoCard(
-                  pricePerTicket:
-                      pricePerTicket,
-                  ticketsSold:
-                      ticketsSold,
-                  totalTickets:
-                      totalTickets,
-                  remainingTickets:
-                      remainingTickets,
-                  maxTicketsPerUser:
-                      maxTicketsPerUser,
-                  userTicketCount:
-                      userTicketCount,
                 ),
 
                 const SizedBox(height: 16),
@@ -346,6 +317,7 @@ class LotteryDetails extends StatelessWidget {
             child: const Icon(
               Icons.image_not_supported,
               size: 60,
+              color: Colors.green,
             ),
           );
         },
@@ -403,15 +375,15 @@ class LotteryDetails extends StatelessWidget {
 
     switch (status) {
       case 'COMPLETED':
-        color = Colors.green;
+        color = Colors.green.shade700;
         break;
 
       case 'DRAWING':
-        color = Colors.green;
+        color = Colors.orange;
         break;
 
       case 'SOLD_OUT':
-        color = Colors.green;
+        color = Colors.red;
         break;
 
       default:
@@ -480,6 +452,7 @@ class LotteryDetails extends StatelessWidget {
               fontSize: 28,
               fontWeight:
                   FontWeight.bold,
+              color: Colors.green,
             ),
           ),
           const SizedBox(height: 4),
@@ -495,105 +468,18 @@ class LotteryDetails extends StatelessWidget {
   }
 
   // ============================================================
-  // TICKET INFORMATION
-  // ============================================================
-
-  Widget _buildInfoCard({
-    required int pricePerTicket,
-    required int ticketsSold,
-    required int totalTickets,
-    required int remainingTickets,
-    required int maxTicketsPerUser,
-    required int userTicketCount,
-  }) {
-    final double progress =
-        totalTickets <= 0
-            ? 0
-            : (ticketsSold / totalTickets)
-                .clamp(0.0, 1.0);
-
-    return Card(
-      elevation: 1,
-      shape: RoundedRectangleBorder(
-        borderRadius:
-            BorderRadius.circular(18),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          children: [
-            _infoRow(
-              'Ticket price',
-              '$pricePerTicket ETB',
-            ),
-            _infoRow(
-              'Tickets sold',
-              '$ticketsSold / $totalTickets',
-            ),
-            _infoRow(
-              'Remaining',
-              '$remainingTickets',
-            ),
-            _infoRow(
-              'Your tickets',
-              '$userTicketCount / '
-                  '$maxTicketsPerUser',
-            ),
-            const SizedBox(height: 12),
-            LinearProgressIndicator(
-              value: progress,
-              minHeight: 8,
-              borderRadius:
-                  BorderRadius.circular(10),
-              color: Colors.green,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _infoRow(
-    String title,
-    String value,
-  ) {
-    return Padding(
-      padding:
-          const EdgeInsets.only(
-        bottom: 10,
-      ),
-      child: Row(
-        children: [
-          Text(title),
-          const Spacer(),
-          Text(
-            value,
-            style: const TextStyle(
-              fontWeight:
-                  FontWeight.bold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ============================================================
   // LOTTERY INFORMATION
   // ============================================================
 
-  Widget _buildExtraLotteryInfo(
+  Widget _buildLotteryInformation(
     Lottery lottery,
   ) {
     return Card(
       elevation: 1,
-      color: Colors.green.withOpacity(.04),
+      color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius:
             BorderRadius.circular(18),
-        side: BorderSide(
-          color: Colors.green.withOpacity(.15),
-        ),
       ),
       child: Padding(
         padding:
@@ -614,92 +500,38 @@ class LotteryDetails extends StatelessWidget {
 
             const SizedBox(height: 14),
 
-            _greenInfoRow(
-              Icons.calendar_today,
+            // Created time
+            _infoRow(
               'Created',
               _formatDate(
                 lottery.createdAt,
               ),
             ),
 
-            _greenInfoRow(
-              Icons.schedule,
+            // Draw time
+            _infoRow(
               'Draw time',
               lottery.nextDrawAt != null
                   ? _formatDate(
                       lottery.nextDrawAt!,
                     )
-                  : 'Not set',
+                  : 'Not scheduled',
             ),
 
-            _greenInfoRow(
-              Icons.emoji_events,
+            // Number of winners
+            _infoRow(
               'Number of winners',
               '${lottery.numberOfWinners}',
             ),
 
-            _greenInfoRow(
-              Icons.repeat,
+            // Draw frequency
+            _infoRow(
               'Draw frequency',
               lottery.drawFrequency ??
                   'One time',
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  Widget _greenInfoRow(
-    IconData icon,
-    String title,
-    String value,
-  ) {
-    return Padding(
-      padding:
-          const EdgeInsets.only(
-        bottom: 14,
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color:
-                  Colors.green.withOpacity(.10),
-              borderRadius:
-                  BorderRadius.circular(10),
-            ),
-            child: Icon(
-              icon,
-              color: Colors.green,
-              size: 19,
-            ),
-          ),
-
-          const SizedBox(width: 12),
-
-          Expanded(
-            child: Text(
-              title,
-              style: TextStyle(
-                color:
-                    Colors.grey.shade700,
-              ),
-            ),
-          ),
-
-          Text(
-            value,
-            textAlign: TextAlign.right,
-            style: const TextStyle(
-              fontWeight:
-                  FontWeight.bold,
-              color: Colors.green,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -721,6 +553,7 @@ class LotteryDetails extends StatelessWidget {
             fontSize: 18,
             fontWeight:
                 FontWeight.bold,
+            color: Colors.green,
           ),
         ),
         const SizedBox(height: 8),
@@ -750,85 +583,122 @@ class LotteryDetails extends StatelessWidget {
     required bool reachedLimit,
     required bool noTicketsLeft,
   }) {
-    if (userTickets.isNotEmpty) {
-      return _buildUserTickets(
-        userTickets,
-        maxTicketsPerUser,
-      );
-    }
-
-    if (noTicketsLeft) {
-      return _messageCard(
-        icon: Icons.block,
-        color: Colors.orange,
-        title: 'Tickets Sold Out',
-        message:
-            'All tickets have been purchased. '
-            'Good luck to everyone in the draw! 🍀',
-      );
-    }
-
-    if (reachedLimit) {
-      return _messageCard(
-        icon: Icons.check_circle,
-        color: Colors.green,
-        title: 'Ticket Limit Reached',
-        message:
-            'You have reached your ticket limit '
-            'for this lottery.\n\nGood luck! 🍀',
-      );
-    }
-
     return Column(
       children: [
-        SizedBox(
-          width: double.infinity,
-          child: ElevatedButton(
-            onPressed: canBuy
-                ? () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) =>
-                            BuyTicketScreen(
-                          lottery: lottery,
-                        ),
-                      ),
-                    );
-                  }
-                : null,
-            style:
-                ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
-              foregroundColor: Colors.white,
-              padding:
-                  const EdgeInsets.symmetric(
-                vertical: 16,
-              ),
-              shape:
-                  RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.circular(15),
-              ),
-            ),
-            child: const Text(
-              'Choose Tickets',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight:
-                    FontWeight.bold,
-              ),
-            ),
+        // --------------------------------------------------------
+        // USER'S EXISTING TICKETS
+        // --------------------------------------------------------
+
+        if (userTickets.isNotEmpty)
+          _buildUserTickets(
+            userTickets,
+            maxTicketsPerUser,
           ),
-        ),
 
-        const SizedBox(height: 10),
+        if (userTickets.isNotEmpty)
+          const SizedBox(height: 16),
 
-        const Text(
-          'Choose your lucky numbers and '
-          'try your luck! 🍀',
-          textAlign: TextAlign.center,
-        ),
+        // --------------------------------------------------------
+        // SOLD OUT
+        // --------------------------------------------------------
+
+        if (noTicketsLeft)
+          _messageCard(
+            icon: Icons.block,
+            color: Colors.orange,
+            title: 'Tickets Sold Out',
+            message:
+                'All tickets have been purchased. '
+                'Good luck to everyone in the draw! 🍀',
+          )
+
+        // --------------------------------------------------------
+        // USER LIMIT REACHED
+        // --------------------------------------------------------
+
+        else if (reachedLimit)
+          _messageCard(
+            icon: Icons.check_circle,
+            color: Colors.green,
+            title: 'Ticket Limit Reached',
+            message:
+                'You have reached your ticket limit '
+                'for this lottery.\n\n'
+                'Good luck! 🍀',
+          )
+
+        // --------------------------------------------------------
+        // CHOOSE TICKETS
+        // --------------------------------------------------------
+
+        else
+          Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: canBuy
+                      ? () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  BuyTicketScreen(
+                                lottery: lottery,
+                              ),
+                            ),
+                          );
+                        }
+                      : null,
+                  style:
+                      ElevatedButton.styleFrom(
+                    backgroundColor:
+                        Colors.green,
+                    foregroundColor:
+                        Colors.white,
+                    padding:
+                        const EdgeInsets.symmetric(
+                      vertical: 16,
+                    ),
+                    shape:
+                        RoundedRectangleBorder(
+                      borderRadius:
+                          BorderRadius.circular(
+                        15,
+                      ),
+                    ),
+                  ),
+                  child: Text(
+                    userTickets.isEmpty
+                        ? 'Choose Tickets'
+                        : 'Buy More Tickets',
+                    style:
+                        const TextStyle(
+                      fontSize: 16,
+                      fontWeight:
+                          FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 10),
+
+              Text(
+                userTickets.isEmpty
+                    ? 'Choose your lucky numbers and '
+                      'try your luck! 🍀'
+                    : 'You can buy more tickets until '
+                      'you reach your limit. 🍀',
+                textAlign:
+                    TextAlign.center,
+                style: TextStyle(
+                  color:
+                      Colors.grey.shade700,
+                ),
+              ),
+            ],
+          ),
       ],
     );
   }
@@ -843,6 +713,7 @@ class LotteryDetails extends StatelessWidget {
   ) {
     return Card(
       elevation: 1,
+      color: Colors.white,
       shape: RoundedRectangleBorder(
         borderRadius:
             BorderRadius.circular(18),
@@ -860,11 +731,10 @@ class LotteryDetails extends StatelessWidget {
                 fontSize: 18,
                 fontWeight:
                     FontWeight.bold,
+                color: Colors.green,
               ),
             ),
-
             const SizedBox(height: 6),
-
             Text(
               '${tickets.length} / '
               '$maxTicketsPerUser tickets',
@@ -872,9 +742,7 @@ class LotteryDetails extends StatelessWidget {
                 color: Colors.grey.shade600,
               ),
             ),
-
             const SizedBox(height: 16),
-
             Wrap(
               spacing: 10,
               runSpacing: 10,
@@ -894,14 +762,13 @@ class LotteryDetails extends StatelessWidget {
                 );
               }).toList(),
             ),
-
             const SizedBox(height: 18),
-
             const Text(
               '🍀 Good luck! Waiting for the draw...',
               style: TextStyle(
                 fontWeight:
                     FontWeight.w600,
+                color: Colors.green,
               ),
             ),
           ],
@@ -1036,19 +903,19 @@ class LotteryDetails extends StatelessWidget {
           const EdgeInsets.all(22),
       decoration: BoxDecoration(
         color:
-            Colors.amber.withOpacity(.12),
+            Colors.green.withOpacity(.10),
         borderRadius:
             BorderRadius.circular(20),
         border: Border.all(
           color:
-              Colors.amber.withOpacity(.4),
+              Colors.green.withOpacity(.4),
         ),
       ),
       child: Column(
         children: [
           const Icon(
             Icons.emoji_events,
-            color: Colors.amber,
+            color: Colors.green,
             size: 65,
           ),
           const SizedBox(height: 10),
@@ -1058,6 +925,7 @@ class LotteryDetails extends StatelessWidget {
               fontSize: 26,
               fontWeight:
                   FontWeight.bold,
+              color: Colors.green,
             ),
           ),
           const SizedBox(height: 8),
@@ -1083,6 +951,7 @@ class LotteryDetails extends StatelessWidget {
               fontWeight:
                   FontWeight.bold,
               fontSize: 18,
+              color: Colors.green,
             ),
           ),
         ],
@@ -1188,6 +1057,7 @@ class LotteryDetails extends StatelessWidget {
                 fontSize: 19,
                 fontWeight:
                     FontWeight.bold,
+                color: Colors.green,
               ),
             ),
             const SizedBox(height: 15),
@@ -1276,7 +1146,40 @@ class LotteryDetails extends StatelessWidget {
   }
 
   // ============================================================
-  // HELPERS
+  // INFO ROW
+  // ============================================================
+
+  Widget _infoRow(
+    String title,
+    String value,
+  ) {
+    return Padding(
+      padding:
+          const EdgeInsets.only(
+        bottom: 10,
+      ),
+      child: Row(
+        children: [
+          Text(title),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                fontWeight:
+                    FontWeight.bold,
+                color: Colors.green,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
+  // DATE FORMAT
   // ============================================================
 
   String _formatDate(DateTime date) {
