@@ -8,7 +8,7 @@ import 'widgets/lottery_card.dart';
 import 'widgets/my_luck_preview.dart';
 import '../notifications/notification_screen.dart';
 import '../../navigation/bottom_nav_screen.dart';
-import '../buy_ticket/buy_ticket_screen.dart';
+import '../lottery_details/lottery_details.dart';
 import '../create_lottery/create_lottery.dart';
 import '../../models/lottery_model.dart';
 import '../../services/lottery_draw_service.dart';
@@ -36,7 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Stores the IDs of lotteries
   // that the current user has purchased.
- final Set<String> _purchasedLotteryIds = <String>{};
+  final Set<String> _purchasedLotteryIds =
+      <String>{};
 
   @override
   void initState() {
@@ -101,14 +102,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (!mounted) return;
 
-setState(() {
-  _purchasedLotteryIds
-    ..clear()
-    ..addAll(ids);
-});
+      setState(() {
+        _purchasedLotteryIds
+          ..clear()
+          ..addAll(ids);
+      });
 
       debugPrint(
-        "Purchased lottery IDs: $_purchasedLotteryIds",
+        "Purchased lottery IDs: "
+        "$_purchasedLotteryIds",
       );
     } catch (e) {
       debugPrint(
@@ -415,7 +417,7 @@ setState(() {
                         "${snapshot.error}",
                       );
 
-                      return Center(
+                      return const Center(
                         child: Text(
                           "Error loading lotteries",
                         ),
@@ -563,19 +565,20 @@ setState(() {
 
                           child:
                               GestureDetector(
+                            // --------------------------------
+                            // LOTTERY CARD → DETAILS
+                            // --------------------------------
                             onTap: () {
-
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
                                   builder: (_) =>
-                                      BuyTicketScreen(
-                                    lottery:
-                                        lottery,
+                                      LotteryDetails(
+                                    lotteryId:
+                                        lottery.id,
                                   ),
                                 ),
                               );
-
                             },
 
                             child:
@@ -616,3 +619,4 @@ setState(() {
     super.dispose();
   }
 }
+

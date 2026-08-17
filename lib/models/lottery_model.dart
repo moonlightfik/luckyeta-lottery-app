@@ -10,9 +10,10 @@ class Lottery {
   final double jackpot;
   final double pricePerTicket;
 
-  final int totalTickets;
-  final int ticketsSold;
-  final int maxTicketsPerUser;
+ final int totalTickets;
+final int ticketsSold;
+final int remainingTickets;
+final int maxTicketsPerUser;
 
   final String category;
   final String cardStyle;
@@ -63,6 +64,7 @@ class Lottery {
 
     required this.totalTickets,
     required this.ticketsSold,
+    required this.remainingTickets,
     required this.maxTicketsPerUser,
 
     required this.category,
@@ -142,6 +144,10 @@ class Lottery {
     final int total =
         (data['totalTickets'] as num?)?.toInt() ?? 0;
 
+        final int remaining =
+    (data['remainingTickets'] as num?)?.toInt() ??
+    (total - sold).clamp(0, total);
+
     // ------------------------------
     // WINNER IDs
     // ------------------------------
@@ -194,13 +200,16 @@ class Lottery {
                   ?.toDouble() ??
               0,
 
-      totalTickets:
-          total,
+     totalTickets:
+    total,
 
-      ticketsSold:
-          sold,
+ticketsSold:
+    sold,
 
-      maxTicketsPerUser:
+remainingTickets:
+    remaining,
+
+maxTicketsPerUser:
           (data['maxTicketsPerUser'] as num?)
                   ?.toInt() ??
               1,
@@ -320,6 +329,10 @@ class Lottery {
 
       "ticketsSold":
           ticketsSold,
+          
+          "remainingTickets":
+    remainingTickets,
+
 
       "maxTicketsPerUser":
           maxTicketsPerUser,
