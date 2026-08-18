@@ -2,47 +2,57 @@ import { db } from "../config/firebase";
 
 /**
  * ============================================================
- * NOTIFICATION HELPER
+ * TYPES
  * ============================================================
- *
- * Creates a notification inside:
- *
- * users/{userId}/notifications
- *
- * This matches the structure used by the Flutter
- * AppNotification model.
  */
-async function createNotification({
-  userId,
-  title,
-  message,
-  type,
-  lotteryId,
-  action,
-  extraData,
-}: {
-  userId: string;
+
+export interface LotteryData {
+  id: string;
   title: string;
-  message: string;
-  type: string;
+  jackpot: number;
+  pricePerTicket?: number;
+  totalTickets?: number;
+  maxTicketsPerUser?: number;
+  numberOfWinners?: number;
+  lotteryType?: string;
+  drawFrequency?: string | null;
+  nextDrawAt?: any;
+  isPublic?: boolean;
+  creatorId?: string;
+  creatorName?: string;
+  createdAt?: any;
+  ticketsSold?: number;
+  remainingTickets?: number;
+  status?: string;
+  winnerIds?: string[];
+  winningTicketNumbers?: number[];
+  drawnAt?: any;
+  resultMessage?: string;
+  description?: string;
+  category?: string;
+  themeColor?: number;
+  cardStyle?: string;
+  imageUrl?: string | null;
+
+  [key: string]: any;
+}
+
+export interface TicketData {
+  ticketId: string;
+  ticketNumber: number;
+  userId: string;
+}
+
+export interface LotteryDrawResult {
+  success: boolean;
   lotteryId: string;
-  action?: string;
-  extraData?: Record<string, any>;
-}) {
-  await db
-    .collection("users")
-    .doc(userId)
-    .collection("notifications")
-    .add({
-      title,
-      message,
-      type,
-      lotteryId,
-      action: action ?? null,
-      isRead: false,
-      createdAt: new Date(),
-      extraData: extraData ?? {},
-    });
+  lotteryTitle: string;
+  jackpot: number;
+  winnerCount: number;
+  winnerIds: string[];
+  winningTicketNumbers: number[];
+  drawnAt: Date;
+  resultMessage: string;
 }
 
 /**
@@ -50,23 +60,31 @@ async function createNotification({
  * GET ALL LOTTERIES
  * ============================================================
  */
-export async function getAllLotteries() {
+
+export async function getAllLotteries(): Promise<LotteryData[]> {
   const snapshot = await db
     .collection("lotteries")
     .get();
 
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  return snapshot.docs.map((doc) => {
+    const data = doc.data();
+
+    return {
+      id: doc.id,
+      ...data,
+    } as LotteryData;
+  });
 }
 
 /**
  * ============================================================
- * GET SINGLE LOTTERY
+ * GET LOTTERY BY ID
  * ============================================================
  */
-export async function getLotteryById(id: string) {
+
+export async function getLotteryById(
+  id: string,
+): Promise<LotteryData | null> {
   const doc = await db
     .collection("lotteries")
     .doc(id)
@@ -76,10 +94,12 @@ export async function getLotteryById(id: string) {
     return null;
   }
 
+  const data = doc.data();
+
   return {
     id: doc.id,
-    ...doc.data(),
-  };
+    ...data,
+  } as LotteryData;
 }
 
 /**
@@ -87,24 +107,36 @@ export async function getLotteryById(id: string) {
  * GET EXPIRED LOTTERIES
  * ============================================================
  *
- * Finds lotteries that:
+ * Finds lotteries whose draw time has arrived.
  *
- * - are DRAWING
- * - have reached their nextDrawAt time
+ * ACTIVE and DRAWING lotteries are accepted because
+ * your existing Firestore data contains both statuses.
  */
-export async function getExpiredLotteries() {
+
+export async function getExpiredLotteries(): Promise<
+  LotteryData[]
+> {
   const now = new Date();
 
   const snapshot = await db
     .collection("lotteries")
-    .where("status", "==", "DRAWING")
     .where("nextDrawAt", "<=", now)
     .get();
 
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  }));
+  return snapshot.docs
+    .map((doc) => {
+      const data = doc.data();
+
+      return {
+        id: doc.id,
+        ...data,
+      } as LotteryData;
+    })
+    .filter(
+      (lottery) =>
+        lottery.status === "ACTIVE" ||
+        lottery.status === "DRAWING",
+    );
 }
 
 /**
@@ -112,13 +144,14 @@ export async function getExpiredLotteries() {
  * START DUE LOTTERIES
  * ============================================================
  *
- * Moves:
- *
  * ACTIVE → DRAWING
  *
- * This does NOT select winners.
+ * This is called by the scheduler when nextDrawAt arrives.
  */
-export async function startDueLotteries() {
+
+export async function startDueLotteries(): Promise<
+  LotteryData[]
+> {
   const now = new Date();
 
   const snapshot = await db
@@ -127,28 +160,24 @@ export async function startDueLotteries() {
     .where("nextDrawAt", "<=", now)
     .get();
 
-  const results = [];
+  const startedLotteries: LotteryData[] = [];
 
   for (const doc of snapshot.docs) {
-    const lottery = doc.data();
+    const data = doc.data();
 
     await doc.ref.update({
       status: "DRAWING",
       drawingStartedAt: now,
     });
 
-    console.log(
-      `Lottery "${lottery.title}" (${doc.id}) changed ACTIVE → DRAWING`,
-    );
-
-    results.push({
-      lotteryId: doc.id,
-      title: lottery.title,
+    startedLotteries.push({
+      id: doc.id,
+      ...data,
       status: "DRAWING",
-    });
+    } as LotteryData);
   }
 
-  return results;
+  return startedLotteries;
 }
 
 /**
@@ -156,21 +185,17 @@ export async function startDueLotteries() {
  * PROCESS ONE LOTTERY
  * ============================================================
  *
- * This function:
- *
- * 1. Gets the lottery.
- * 2. Finds all ACTIVE tickets.
- * 3. Selects random winner(s).
- * 4. Saves winning ticket numbers.
- * 5. Saves winner user IDs.
- * 6. Changes lottery → COMPLETED.
- * 7. Changes winning tickets → WON.
- * 8. Changes losing tickets → LOST.
- * 9. Sends winner notifications.
- * 10. Sends loser notifications.
- * 11. Sends creator draw-completed notification.
+ * 1. Find lottery
+ * 2. Find all purchased tickets
+ * 3. Randomly select winner(s)
+ * 4. Save result
+ * 5. Mark tickets WON / LOST
+ * 6. Return complete result
  */
-export async function processLottery(lotteryId: string) {
+
+export async function processLottery(
+  lotteryId: string,
+): Promise<LotteryDrawResult> {
   const lotteryRef = db
     .collection("lotteries")
     .doc(lotteryId);
@@ -186,42 +211,44 @@ export async function processLottery(lotteryId: string) {
     lotterySnapshot.data();
 
   if (!lottery) {
-    throw new Error("Lottery data is missing");
+    throw new Error(
+      "Lottery data is missing",
+    );
   }
 
   /**
-   * Prevent duplicate draws.
+   * Prevent duplicate drawing.
    */
+
   if (
     lottery.status !== "ACTIVE" &&
     lottery.status !== "DRAWING"
   ) {
-    return {
-      success: false,
-      message: "Lottery has already been processed",
-    };
+    throw new Error(
+      "Lottery has already been processed",
+    );
   }
 
   /**
    * ==========================================================
-   * GET ALL USERS
+   * GET USERS
    * ==========================================================
    */
+
   const usersSnapshot =
     await db.collection("users").get();
 
-  const allTickets: Array<{
-    ticketId: string;
-    ticketNumber: number;
-    userId: string;
-  }> = [];
+  const allTickets: TicketData[] = [];
 
   /**
    * ==========================================================
-   * FIND ALL TICKETS FOR THIS LOTTERY
+   * FIND ALL TICKETS
    * ==========================================================
    */
-  for (const userDoc of usersSnapshot.docs) {
+
+  for (
+    const userDoc of usersSnapshot.docs
+  ) {
     const ticketsSnapshot =
       await userDoc.ref
         .collection("tickets")
@@ -237,21 +264,26 @@ export async function processLottery(lotteryId: string) {
         )
         .get();
 
-    for (const ticketDoc of ticketsSnapshot.docs) {
+    for (
+      const ticketDoc of ticketsSnapshot.docs
+    ) {
       const ticketData =
         ticketDoc.data();
 
       if (
-        ticketData.ticketNumber == null
+        ticketData.ticketNumber ==
+        null
       ) {
         continue;
       }
 
       allTickets.push({
         ticketId: ticketDoc.id,
+
         ticketNumber: Number(
           ticketData.ticketNumber,
         ),
+
         userId: userDoc.id,
       });
     }
@@ -262,63 +294,63 @@ export async function processLottery(lotteryId: string) {
    * NO TICKETS
    * ==========================================================
    */
+
   if (allTickets.length === 0) {
     const drawnAt = new Date();
 
+    const resultMessage =
+      "Lottery completed. No tickets were purchased.";
+
     await lotteryRef.update({
       status: "COMPLETED",
-      winnerIds: [],
-      winningTicketNumbers: [],
-      drawnAt,
-      resultMessage:
-        "Lottery completed. No tickets were purchased.",
-    });
 
-    /**
-     * Notify creator even when nobody participated.
-     */
-    if (lottery.creatorId) {
-      await createNotification({
-        userId: lottery.creatorId,
-        title: "🏁 Draw Completed",
-        message:
-          `The draw for "${lottery.title}" has finished, ` +
-          `but no tickets were purchased.`,
-        type: "draw_complete",
-        lotteryId,
-        action: "view_lottery",
-        extraData: {
-          winnersCount: 0,
-          totalParticipants: 0,
-          winnerIds: [],
-          winningNumbers: [],
-          creatorName:
-            lottery.creatorName ?? "Creator",
-        },
-      });
-    }
+      winnerIds: [],
+
+      winningTicketNumbers: [],
+
+      drawnAt,
+
+      resultMessage,
+    });
 
     return {
       success: true,
+
       lotteryId,
-      lotteryTitle: lottery.title,
-      jackpot: lottery.jackpot,
+
+      lotteryTitle:
+        String(
+          lottery.title ??
+            "LuckyEta Lottery",
+        ),
+
+      jackpot:
+        Number(
+          lottery.jackpot ?? 0,
+        ),
+
       winnerCount: 0,
+
       winnerIds: [],
+
       winningTicketNumbers: [],
+
       drawnAt,
-      resultMessage:
-        "Lottery completed. No tickets were purchased.",
+
+      resultMessage,
     };
   }
 
   /**
    * ==========================================================
-   * NUMBER OF WINNERS
+   * DETERMINE WINNER COUNT
    * ==========================================================
    */
+
   const requestedWinners =
-    Number(lottery.numberOfWinners) || 1;
+    Number(
+      lottery.numberOfWinners ?? 1,
+    );
 
   const winnerCount = Math.min(
     requestedWinners,
@@ -330,11 +362,14 @@ export async function processLottery(lotteryId: string) {
    * FISHER-YATES SHUFFLE
    * ==========================================================
    */
-  const shuffledTickets =
-    [...allTickets];
+
+  const shuffledTickets = [
+    ...allTickets,
+  ];
 
   for (
-    let i = shuffledTickets.length - 1;
+    let i =
+      shuffledTickets.length - 1;
     i > 0;
     i--
   ) {
@@ -356,6 +391,7 @@ export async function processLottery(lotteryId: string) {
    * SELECT WINNERS
    * ==========================================================
    */
+
   const winners =
     shuffledTickets.slice(
       0,
@@ -364,7 +400,8 @@ export async function processLottery(lotteryId: string) {
 
   const winnerIds =
     winners.map(
-      (winner) => winner.userId,
+      (winner) =>
+        winner.userId,
     );
 
   const winningTicketNumbers =
@@ -385,20 +422,28 @@ export async function processLottery(lotteryId: string) {
    * SAVE LOTTERY RESULT
    * ==========================================================
    */
+
   await lotteryRef.update({
     status: "COMPLETED",
+
     winnerIds,
+
     winningTicketNumbers,
+
     drawnAt,
+
     resultMessage,
   });
 
   /**
    * ==========================================================
-   * UPDATE EVERY TICKET
+   * UPDATE TICKETS
    * ==========================================================
    */
-  for (const ticket of allTickets) {
+
+  for (
+    const ticket of allTickets
+  ) {
     const ticketRef =
       db
         .collection("users")
@@ -413,9 +458,6 @@ export async function processLottery(lotteryId: string) {
           ticket.ticketId,
       );
 
-    /**
-     * Update ticket status.
-     */
     await ticketRef.update({
       status: isWinner
         ? "WON"
@@ -427,140 +469,29 @@ export async function processLottery(lotteryId: string) {
 
       drawnAt,
     });
-
-    /**
-     * ========================================================
-     * WINNER NOTIFICATION
-     * ========================================================
-     */
-    if (isWinner) {
-      await createNotification({
-        userId: ticket.userId,
-
-        title:
-          "🎉 Congratulations!",
-
-        message:
-          `You won "${lottery.title}" ` +
-          `with ticket #${ticket.ticketNumber}! ` +
-          `Tap here to claim your prize.`,
-
-        type: "winner",
-
-        lotteryId,
-
-        action: "claim_prize",
-
-        extraData: {
-          ticketNumber:
-            ticket.ticketNumber,
-
-          lotteryTitle:
-            lottery.title,
-
-          jackpot:
-            lottery.jackpot,
-        },
-      });
-    }
-
-    /**
-     * ========================================================
-     * LOSER NOTIFICATION
-     * ========================================================
-     */
-    else {
-      await createNotification({
-        userId: ticket.userId,
-
-        title:
-          "🍀 Better Luck Next Time",
-
-        message:
-          `The draw for "${lottery.title}" ` +
-          `has ended. Your ticket #${ticket.ticketNumber} ` +
-          `wasn't selected this time.`,
-
-        type: "loser",
-
-        lotteryId,
-
-        action: "buy_again",
-
-        extraData: {
-          ticketNumber:
-            ticket.ticketNumber,
-
-          lotteryTitle:
-            lottery.title,
-        },
-      });
-    }
   }
 
   /**
    * ==========================================================
-   * CREATOR DRAW COMPLETED NOTIFICATION
+   * RETURN RESULT
    * ==========================================================
    */
-  if (lottery.creatorId) {
-    await createNotification({
-      userId:
-        lottery.creatorId,
 
-      title:
-        "🏆 Draw Completed!",
-
-      message:
-        `The draw for "${lottery.title}" ` +
-        `has finished!\n\n` +
-        `🎯 ${winnerCount} winner(s) ` +
-        `selected from ${allTickets.length} ` +
-        `participants.\n\n` +
-        `Tap to view the winners.`,
-
-      type:
-        "draw_complete",
-
-      lotteryId,
-
-      action:
-        "view_winners",
-
-      extraData: {
-        winnersCount:
-          winnerCount,
-
-        totalParticipants:
-          allTickets.length,
-
-        winnerIds,
-
-        winningNumbers:
-          winningTicketNumbers,
-
-        creatorName:
-          lottery.creatorName ??
-          "Creator",
-      },
-    });
-  }
-
-  /**
-   * ==========================================================
-   * RETURN DRAW RESULT
-   * ==========================================================
-   */
   return {
     success: true,
 
     lotteryId,
 
     lotteryTitle:
-      lottery.title,
+      String(
+        lottery.title ??
+          "LuckyEta Lottery",
+      ),
 
     jackpot:
-      lottery.jackpot,
+      Number(
+        lottery.jackpot ?? 0,
+      ),
 
     winnerCount,
 
@@ -579,15 +510,18 @@ export async function processLottery(lotteryId: string) {
  * PROCESS ALL EXPIRED LOTTERIES
  * ============================================================
  */
-export async function processExpiredLotteries() {
+
+export async function processExpiredLotteries(): Promise<
+  LotteryDrawResult[]
+> {
   const expiredLotteries =
     await getExpiredLotteries();
 
-  const results = [];
+  const results: LotteryDrawResult[] =
+    [];
 
   for (
-    const lottery
-    of expiredLotteries
+    const lottery of expiredLotteries
   ) {
     try {
       const result =
@@ -598,7 +532,7 @@ export async function processExpiredLotteries() {
       results.push(result);
     } catch (error) {
       console.error(
-        `Failed to process lottery ${lottery.id}:`,
+        `❌ Failed to process lottery ${lottery.id}:`,
         error,
       );
     }
@@ -612,27 +546,30 @@ export async function processExpiredLotteries() {
  * GET HOME LOTTERIES
  * ============================================================
  *
- * Home visibility rules:
+ * Home visibility:
  *
- * 1. Public ACTIVE lotteries
- *    → visible to everyone.
+ * PUBLIC:
+ *   ACTIVE     ✓
+ *   DRAWING    ✓
+ *   COMPLETED  ✓ for 30 days
  *
- * 2. Public DRAWING lotteries
- *    → visible to everyone.
+ * CREATOR:
+ *   ACTIVE     ✓
+ *   DRAWING    ✓
+ *   COMPLETED  ✓ for 30 days
  *
- * 3. User-created lotteries
- *    → visible to creator, including COMPLETED.
+ * BUYER:
+ *   ACTIVE     ✓
+ *   DRAWING    ✓
+ *   COMPLETED  ✓ for 30 days
  *
- * 4. Purchased lotteries
- *    → visible to buyer.
- *
- * 5. COMPLETED lotteries
- *    → remain visible for 30 days after draw
- *      if public or purchased.
+ * After 30 days from drawnAt:
+ *   COMPLETED lotteries disappear from Home.
  */
+
 export async function getHomeLotteries(
   userId: string,
-) {
+): Promise<LotteryData[]> {
   const now = new Date();
 
   const thirtyDaysAgo =
@@ -645,18 +582,69 @@ export async function getHomeLotteries(
           1000,
     );
 
-  const snapshot =
+  /**
+   * Get all lotteries.
+   */
+
+  const lotterySnapshot =
     await db
       .collection("lotteries")
       .get();
 
-  const lotteries = [];
+  /**
+   * Get this user's tickets once.
+   */
+
+  const userTicketsSnapshot =
+    await db
+      .collection("users")
+      .doc(userId)
+      .collection("tickets")
+      .get();
+
+  /**
+   * Store purchased lottery IDs.
+   */
+
+  const purchasedLotteryIds =
+    new Set<string>();
 
   for (
-    const doc of snapshot.docs
+    const ticketDoc of
+      userTicketsSnapshot.docs
+  ) {
+    const ticketData =
+      ticketDoc.data();
+
+    if (
+      ticketData.lotteryID
+    ) {
+      purchasedLotteryIds.add(
+        String(
+          ticketData.lotteryID,
+        ),
+      );
+    }
+  }
+
+  const homeLotteries: LotteryData[] =
+    [];
+
+  /**
+   * ==========================================================
+   * CHECK EVERY LOTTERY
+   * ==========================================================
+   */
+
+  for (
+    const doc of
+      lotterySnapshot.docs
   ) {
     const lottery =
       doc.data();
+
+    const lotteryId =
+      doc.id;
 
     const isPublic =
       lottery.isPublic === true;
@@ -665,138 +653,158 @@ export async function getHomeLotteries(
       lottery.creatorId ===
       userId;
 
-    /**
-     * Check whether this user purchased
-     * a ticket.
-     */
-    const ticketsSnapshot =
-      await db
-        .collection("users")
-        .doc(userId)
-        .collection("tickets")
-        .where(
-          "lotteryID",
-          "==",
-          doc.id,
-        )
-        .limit(1)
-        .get();
+    const hasPurchased =
+      purchasedLotteryIds.has(
+        lotteryId,
+      );
 
-    const hasPurchasedTicket =
-      !ticketsSnapshot.empty;
+    const status =
+      lottery.status;
 
     /**
      * ========================================================
-     * PUBLIC ACTIVE / DRAWING
+     * ACTIVE / DRAWING
      * ========================================================
      */
+
     if (
-      isPublic &&
-      (
-        lottery.status ===
-          "ACTIVE" ||
-        lottery.status ===
-          "DRAWING"
-      )
+      status === "ACTIVE" ||
+      status === "DRAWING"
     ) {
-      lotteries.push({
-        id: doc.id,
-        ...lottery,
-      });
+      if (
+        isPublic ||
+        isCreator ||
+        hasPurchased
+      ) {
+        homeLotteries.push({
+          id: lotteryId,
+          ...lottery,
+        } as LotteryData);
 
-      continue;
+        continue;
+      }
     }
 
     /**
      * ========================================================
-     * CREATOR'S LOTTERY
+     * COMPLETED
      * ========================================================
      */
-    if (isCreator) {
-      lotteries.push({
-        id: doc.id,
-        ...lottery,
-      });
 
-      continue;
-    }
-
-    /**
-     * ========================================================
-     * PURCHASED LOTTERY
-     * ========================================================
-     *
-     * Keep purchased lotteries visible while active/drawing.
-     */
     if (
-      hasPurchasedTicket &&
-      (
-        lottery.status ===
-          "ACTIVE" ||
-        lottery.status ===
-          "DRAWING"
-      )
+      status === "COMPLETED"
     ) {
-      lotteries.push({
-        id: doc.id,
-        ...lottery,
-      });
+      let drawnAt:
+        | Date
+        | null = null;
 
-      continue;
-    }
-
-    /**
-     * ========================================================
-     * COMPLETED LOTTERY
-     * ========================================================
-     *
-     * Keep completed lotteries for 30 days.
-     */
-    if (
-      lottery.status ===
-      "COMPLETED"
-    ) {
-      const drawnAt =
-        lottery.drawnAt
-          ?.toDate?.();
+      /**
+       * Firestore Timestamp.
+       */
 
       if (
-        drawnAt &&
-        drawnAt >=
-          thirtyDaysAgo &&
-        (
-          isPublic ||
-          hasPurchasedTicket
-        )
+        lottery.drawnAt &&
+        typeof lottery.drawnAt
+          .toDate ===
+          "function"
       ) {
-        lotteries.push({
-          id: doc.id,
+        drawnAt =
+          lottery.drawnAt.toDate();
+      }
+
+      /**
+       * JS Date.
+       */
+
+      else if (
+        lottery.drawnAt instanceof
+        Date
+      ) {
+        drawnAt =
+          lottery.drawnAt;
+      }
+
+      /**
+       * Firestore serialized timestamp.
+       */
+
+      else if (
+        lottery.drawnAt?._seconds
+      ) {
+        drawnAt =
+          new Date(
+            Number(
+              lottery.drawnAt
+                ._seconds,
+            ) * 1000,
+          );
+      }
+
+      /**
+       * Without drawnAt we can't
+       * determine the 30-day period.
+       */
+
+      if (!drawnAt) {
+        continue;
+      }
+
+      /**
+       * Remove after 30 days.
+       */
+
+      if (
+        drawnAt <
+        thirtyDaysAgo
+      ) {
+        continue;
+      }
+
+      /**
+       * Completed lottery is visible
+       * if public, creator, or buyer.
+       */
+
+      if (
+        isPublic ||
+        isCreator ||
+        hasPurchased
+      ) {
+        homeLotteries.push({
+          id: lotteryId,
           ...lottery,
-        });
+        } as LotteryData);
       }
     }
   }
 
   /**
    * ==========================================================
-   * NEWEST FIRST
+   * SORT NEWEST FIRST
    * ==========================================================
    */
-  lotteries.sort(
-    (a: any, b: any) => {
-      const aTime =
-        a.createdAt
-          ?.toMillis?.() ??
+
+  homeLotteries.sort(
+    (
+      a: LotteryData,
+      b: LotteryData,
+    ) => {
+      const aCreated =
+        a.createdAt?.toMillis?.() ??
+        a.createdAt?._seconds ??
         0;
 
-      const bTime =
-        b.createdAt
-          ?.toMillis?.() ??
+      const bCreated =
+        b.createdAt?.toMillis?.() ??
+        b.createdAt?._seconds ??
         0;
 
-      return bTime - aTime;
+      return (
+        Number(bCreated) -
+        Number(aCreated)
+      );
     },
   );
 
-  return lotteries;
+  return homeLotteries;
 }
