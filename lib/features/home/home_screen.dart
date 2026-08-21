@@ -493,7 +493,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           isPublic &&
                           (
                             status == "ACTIVE" ||
-                            status == "DRAWING"
+                           status == "DRAWING" ||
+                         status == "COMPLETED"
                           );
 
                       // --------------------------------

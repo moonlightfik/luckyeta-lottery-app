@@ -1,152 +1,266 @@
 import 'dart:math';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../services/notification_service.dart';
 
 class LotteryDrawService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final NotificationService _notificationService = NotificationService();
+  final NotificationService _notificationService =
+      NotificationService();
+
   final Random _random = Random();
 
-  //==============================
-  // Lock Lottery
-  //==============================
+  // ============================================================
+  // LOCK LOTTERY
+  // ============================================================
+
   Future<void> lockLottery(String lotteryId) async {
     await _firestore
         .collection('lotteries')
         .doc(lotteryId)
         .update({
-      "status": "DRAWING",
+      'status': 'DRAWING',
     });
   }
 
-  //==============================
-  // Pick Winning Tickets (FIXED)
-  //==============================
-  Future<List<Map<String, dynamic>>> pickWinningTickets({
-    required String lotteryId,
-    required int winnersNeeded,
-  }) async {
+  // ============================================================
+  // GET ALL ACTIVE TICKETS FOR A LOTTERY
+  //
+  // IMPORTANT:
+  // We get the tickets BEFORE changing the lottery status to
+  // DRAWING.
+  //
+  // This guarantees that tickets belonging to ALL users are
+  // collected.
+  // ============================================================
+
+  Future<List<QueryDocumentSnapshot<Map<String, dynamic>>>>
+      getActiveTickets(String lotteryId) async {
     final snapshot = await _firestore
-        .collectionGroup("tickets")
-        .where("lotteryID", isEqualTo: lotteryId)
-        .where("status", isEqualTo: "ACTIVE")
+        .collectionGroup('tickets')
+        .where(
+          'lotteryID',
+          isEqualTo: lotteryId,
+        )
+        .where(
+          'status',
+          isEqualTo: 'ACTIVE',
+        )
         .get();
 
-    if (snapshot.docs.isEmpty) {
-      throw Exception("No purchased tickets found.");
-    }
-
-    final tickets = snapshot.docs
-        .map((doc) => {
-              "reference": doc.reference,
-              "userId": doc["userId"],
-              "ticketNumber": doc["ticketNumber"],
-              "data": doc.data(),
-            })
-        .toList();
-
-    // Shuffle so every ticket has equal chance
-    tickets.shuffle(_random);
-
-    // Ensure we don't ask for more winners than available tickets
-    final actualWinners = min(winnersNeeded, tickets.length);
-    
-    return tickets.take(actualWinners).toList();
+    return snapshot.docs;
   }
 
-  //==============================
-  // Draw Lottery (FIXED)
-  //==============================
+  // ============================================================
+  // PICK WINNING TICKETS
+  // ============================================================
+
+  List<QueryDocumentSnapshot<Map<String, dynamic>>>
+      pickWinningTickets({
+    required List<QueryDocumentSnapshot<Map<String, dynamic>>>
+        tickets,
+    required int winnersNeeded,
+  }) {
+    if (tickets.isEmpty) {
+      return [];
+    }
+
+    final shuffled = List<
+        QueryDocumentSnapshot<Map<String, dynamic>>>.from(
+      tickets,
+    );
+
+    // Every ticket gets an equal chance.
+    shuffled.shuffle(_random);
+
+    final actualWinners =
+        min(winnersNeeded, shuffled.length);
+
+    return shuffled
+        .take(actualWinners)
+        .toList();
+  }
+
+  // ============================================================
+  // DRAW LOTTERY
+  // ============================================================
+
   Future<void> drawLottery(String lotteryId) async {
-    final lotteryRef = _firestore.collection("lotteries").doc(lotteryId);
+    final lotteryRef =
+        _firestore.collection('lotteries').doc(lotteryId);
+
+    // ----------------------------------------------------------
+    // GET LOTTERY
+    // ----------------------------------------------------------
+
     final lotterySnapshot = await lotteryRef.get();
 
     if (!lotterySnapshot.exists) {
-      throw Exception("Lottery does not exist.");
+      throw Exception('Lottery does not exist.');
     }
 
     final lottery = lotterySnapshot.data()!;
 
-    if (lottery["status"] != "ACTIVE") {
+    final currentStatus =
+        (lottery['status'] ?? '').toString().toUpperCase();
+
+    // Don't draw a lottery that is no longer ACTIVE.
+    if (currentStatus != 'ACTIVE') {
       return;
     }
 
-    // Prevent anyone from purchasing while drawing
+    // ----------------------------------------------------------
+    // GET ALL ACTIVE TICKETS FIRST
+    // ----------------------------------------------------------
+    //
+    // THIS IS THE IMPORTANT FIX.
+    //
+    // We must retrieve all users' tickets while they are still
+    // ACTIVE.
+    // ----------------------------------------------------------
+
+    final allActiveTickets =
+        await getActiveTickets(lotteryId);
+
+    if (allActiveTickets.isEmpty) {
+      await lotteryRef.update({
+        'status': 'COMPLETED',
+        'drawCompletedAt':
+            FieldValue.serverTimestamp(),
+        'message': 'No participants',
+      });
+
+      return;
+    }
+
+    // ----------------------------------------------------------
+    // LOCK LOTTERY
+    // ----------------------------------------------------------
+
     await lockLottery(lotteryId);
 
-    final int winnersNeeded = lottery["numberOfWinners"] ?? 1;
+    // ----------------------------------------------------------
+    // NUMBER OF WINNERS
+    // ----------------------------------------------------------
 
-    final winners = await pickWinningTickets(
-      lotteryId: lotteryId,
+    final int winnersNeeded =
+        (lottery['numberOfWinners'] as num?)?.toInt() ?? 1;
+
+    // ----------------------------------------------------------
+    // PICK WINNERS
+    // ----------------------------------------------------------
+
+    final winners = pickWinningTickets(
+      tickets: allActiveTickets,
       winnersNeeded: winnersNeeded,
     );
 
     if (winners.isEmpty) {
-      // No tickets to draw from
       await lotteryRef.update({
-        "status": "COMPLETED",
-        "drawCompletedAt": FieldValue.serverTimestamp(),
-        "message": "No participants",
+        'status': 'COMPLETED',
+        'drawCompletedAt':
+            FieldValue.serverTimestamp(),
+        'message': 'No participants',
       });
+
       return;
     }
 
+    // ----------------------------------------------------------
+    // WINNER REFERENCES
+    // ----------------------------------------------------------
+    //
+    // We identify winners by their actual Firestore document
+    // reference instead of matching ticket numbers.
+    // ----------------------------------------------------------
+
+    final Set<String> winningTicketIds = winners
+        .map((ticket) => ticket.id)
+        .toSet();
+
+    final List<String> winningUserIds = winners
+        .map(
+          (ticket) =>
+              ticket.data()['userId']?.toString() ?? '',
+        )
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    final List<int> winningTicketNumbers = winners
+        .map(
+          (ticket) =>
+              (ticket.data()['ticketNumber'] as num?)?.toInt() ??
+              0,
+        )
+        .toList();
+
+    // ==========================================================
+    // BATCH UPDATE
+    // ==========================================================
+
     final batch = _firestore.batch();
 
-    // Get the winning ticket numbers and user IDs
-    final winningTicketNumbers = winners.map((w) => w["ticketNumber"] as int).toList();
-    final winningUserIds = winners.map((w) => w["userId"] as String).toList();
+    // ----------------------------------------------------------
+    // MARK EVERY TICKET
+    // ----------------------------------------------------------
+    //
+    // Because allActiveTickets contains tickets from ALL users,
+    // every participant gets updated.
+    // ----------------------------------------------------------
 
-    // -------------------------
-    // Mark Winners (FIXED)
-    // -------------------------
-    for (final winner in winners) {
-      batch.update(
-        winner["reference"],
-        {
-          "status": "WON",
-          "wonAt": FieldValue.serverTimestamp(),
-        },
-      );
-    }
+    for (final ticket in allActiveTickets) {
+      final ticketData = ticket.data();
 
-    // -------------------------
-    // Mark Losers (FIXED)
-    // -------------------------
-    final allTickets = await _firestore
-        .collectionGroup("tickets")
-        .where("lotteryID", isEqualTo: lotteryId)
-        .where("status", isEqualTo: "ACTIVE")
-        .get();
+      final isWinner =
+          winningTicketIds.contains(ticket.id);
 
-    for (final doc in allTickets.docs) {
-      final ticketNumber = doc["ticketNumber"] as int;
-      final userId = doc["userId"] as String;
-      
-      // Check if THIS SPECIFIC ticket is a winner
-      final isWinner = winningTicketNumbers.contains(ticketNumber) && 
-                       winningUserIds.contains(userId);
-      
-      if (!isWinner) {
-        batch.update(doc.reference, {
-          "status": "LOST",
-        });
+      if (isWinner) {
+        batch.update(
+          ticket.reference,
+          {
+            'status': 'WON',
+            'wonAt':
+                FieldValue.serverTimestamp(),
+          },
+        );
+      } else {
+        batch.update(
+          ticket.reference,
+          {
+            'status': 'LOST',
+            'lostAt':
+                FieldValue.serverTimestamp(),
+          },
+        );
       }
     }
 
-    // -------------------------
-    // Update Lottery Document
-    // -------------------------
-    batch.update(lotteryRef, {
-      "winnerIds": winningUserIds,
-      "winningTickets": winningTicketNumbers,
-      "drawCompletedAt": FieldValue.serverTimestamp(),
-      "status": "COMPLETED", // Will be updated to ACTIVE for recurring
-    });
+    // ----------------------------------------------------------
+    // UPDATE LOTTERY
+    // ----------------------------------------------------------
+
+    batch.update(
+      lotteryRef,
+      {
+        'winnerIds': winningUserIds,
+        'winningTickets': winningTicketNumbers,
+        'drawCompletedAt':
+            FieldValue.serverTimestamp(),
+        'status': 'COMPLETED',
+      },
+    );
+
+    // ----------------------------------------------------------
+    // COMMIT EVERYTHING TO FIRESTORE
+    // ----------------------------------------------------------
 
     await batch.commit();
 
-    // Complete the lottery process
+    // ----------------------------------------------------------
+    // COMPLETE LOTTERY
+    // ----------------------------------------------------------
+
     await completeLottery(
       lotteryId: lotteryId,
       lotteryData: lottery,
@@ -155,21 +269,28 @@ class LotteryDrawService {
     );
   }
 
-  //==============================
-  // Complete Lottery (FIXED)
-  //==============================
+  // ============================================================
+  // COMPLETE LOTTERY
+  // ============================================================
+
   Future<void> completeLottery({
     required String lotteryId,
     required Map<String, dynamic> lotteryData,
     required List<String> winnerIds,
     required List<int> winningNumbers,
   }) async {
-    final lotteryRef = _firestore.collection("lotteries").doc(lotteryId);
+    final lotteryType =
+        (lotteryData['lotteryType'] ?? '')
+            .toString()
+            .toLowerCase();
 
-    final bool recurring = lotteryData["lotteryType"] == "recurring" ||
-        lotteryData["lotteryType"] == "recurring";
+    final bool recurring =
+        lotteryType == 'recurring';
 
-    // Save history
+    // ----------------------------------------------------------
+    // SAVE DRAW HISTORY
+    // ----------------------------------------------------------
+
     await saveDrawHistory(
       lotteryId: lotteryId,
       lotteryData: lotteryData,
@@ -177,22 +298,35 @@ class LotteryDrawService {
       winningTickets: winningNumbers,
     );
 
-    // Archive old tickets
-    await archiveOldTickets(lotteryId: lotteryId);
+    // ----------------------------------------------------------
+    // ARCHIVE RESULTS
+    // ----------------------------------------------------------
+    //
+    // We COPY the WON/LOST tickets to ticketHistory.
+    //
+    // We DO NOT delete the original tickets because
+    // MyLotteriesScreen listens to users/{uid}/tickets.
+    // ----------------------------------------------------------
+
+    await archiveOldTickets(
+      lotteryId: lotteryId,
+    );
+
+    // ----------------------------------------------------------
+    // RECURRING LOTTERY
+    // ----------------------------------------------------------
 
     if (recurring) {
       await resetRecurringLottery(
         lotteryId: lotteryId,
         lotteryData: lotteryData,
-        winnerIds: winnerIds,
-        winningNumbers: winningNumbers,
       );
-    } else {
-      // Already updated in drawLottery
-      // Just send notifications
     }
 
-    // Send Notifications
+    // ----------------------------------------------------------
+    // NOTIFICATIONS
+    // ----------------------------------------------------------
+
     await _sendNotifications(
       lotteryId: lotteryId,
       lotteryData: lotteryData,
@@ -201,101 +335,209 @@ class LotteryDrawService {
     );
   }
 
-  //==============================
-  // Send Notifications (FIXED)
-  //==============================
+  // ============================================================
+  // SEND NOTIFICATIONS
+  // ============================================================
+
   Future<void> _sendNotifications({
     required String lotteryId,
     required Map<String, dynamic> lotteryData,
     required List<String> winnerIds,
     required List<int> winningNumbers,
   }) async {
-    // Notify creator
+    // ----------------------------------------------------------
+    // CREATOR
+    // ----------------------------------------------------------
+
     await _notificationService.notifyDrawCompleted(
-      creatorId: lotteryData["creatorId"],
-      creatorName: lotteryData["creatorName"],
+      creatorId:
+          lotteryData['creatorId']?.toString() ?? '',
+      creatorName:
+          lotteryData['creatorName']?.toString() ??
+              'Creator',
       lotteryId: lotteryId,
-      lotteryTitle: lotteryData["title"],
+      lotteryTitle:
+          lotteryData['title']?.toString() ??
+              'Lottery',
     );
 
-    // Notify winners
+    // ----------------------------------------------------------
+    // WINNERS
+    // ----------------------------------------------------------
+
     for (final winnerId in winnerIds) {
       await _notificationService.notifyWinner(
         userId: winnerId,
         lotteryId: lotteryId,
-        lotteryTitle: lotteryData["title"],
+        lotteryTitle:
+            lotteryData['title']?.toString() ??
+                'Lottery',
       );
     }
 
-    // Notify losers
+    // ----------------------------------------------------------
+    // LOSERS
+    // ----------------------------------------------------------
+    //
+    // At this point the batch has already committed, so the
+    // WON/LOST statuses are actually present in Firestore.
+    // ----------------------------------------------------------
+
     final losers = await _firestore
-        .collectionGroup("tickets")
-        .where("lotteryID", isEqualTo: lotteryId)
-        .where("status", isEqualTo: "LOST")
+        .collectionGroup('tickets')
+        .where(
+          'lotteryID',
+          isEqualTo: lotteryId,
+        )
+        .where(
+          'status',
+          isEqualTo: 'LOST',
+        )
         .get();
 
     for (final loser in losers.docs) {
+      final userId =
+          loser.data()['userId']?.toString();
+
+      if (userId == null || userId.isEmpty) {
+        continue;
+      }
+
       await _notificationService.notifyLoser(
-        userId: loser["userId"],
+        userId: userId,
         lotteryId: lotteryId,
-        lotteryTitle: lotteryData["title"],
+        lotteryTitle:
+            lotteryData['title']?.toString() ??
+                'Lottery',
       );
     }
   }
 
-  //==============================
-  // Reset Recurring Lottery
-  //==============================
+  // ============================================================
+  // RESET RECURRING LOTTERY
+  // ============================================================
+
   Future<void> resetRecurringLottery({
     required String lotteryId,
     required Map<String, dynamic> lotteryData,
-    required List<String> winnerIds,
-    required List<int> winningNumbers,
   }) async {
-    final lotteryRef = _firestore.collection("lotteries").doc(lotteryId);
+    final lotteryRef =
+        _firestore.collection('lotteries').doc(lotteryId);
 
-    DateTime nextDraw = (lotteryData["nextDrawAt"] as Timestamp).toDate();
+    final nextDrawTimestamp =
+        lotteryData['nextDrawAt'];
 
-    if (lotteryData["drawFrequency"] == "Daily") {
-      nextDraw = nextDraw.add(const Duration(days: 1));
-    } else {
-      nextDraw = nextDraw.add(const Duration(days: 7));
+    if (nextDrawTimestamp is! Timestamp) {
+      throw Exception(
+        'Recurring lottery is missing nextDrawAt.',
+      );
     }
 
+    DateTime nextDraw =
+        nextDrawTimestamp.toDate();
+
+    final frequency =
+        lotteryData['drawFrequency']
+            ?.toString();
+
+    // ----------------------------------------------------------
+    // DAILY
+    // ----------------------------------------------------------
+
+    if (frequency == 'Daily') {
+      nextDraw =
+          nextDraw.add(const Duration(days: 1));
+    }
+
+    // ----------------------------------------------------------
+    // WEEKLY
+    // ----------------------------------------------------------
+
+    else if (frequency == 'Weekly') {
+      nextDraw =
+          nextDraw.add(const Duration(days: 7));
+    }
+
+    // ----------------------------------------------------------
+    // HOURLY
+    // ----------------------------------------------------------
+
+    else if (frequency == 'Hourly') {
+      nextDraw =
+          nextDraw.add(const Duration(hours: 1));
+    }
+
+    // ----------------------------------------------------------
+    // UNKNOWN FREQUENCY
+    // ----------------------------------------------------------
+
+    else {
+      throw Exception(
+        'Unknown recurring draw frequency: $frequency',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // RESET LOTTERY FOR THE NEXT ROUND
+    // ----------------------------------------------------------
+    //
+    // IMPORTANT:
+    // We DO NOT reset old tickets to ACTIVE.
+    //
+    // Old tickets remain:
+    //
+    // WON / LOST
+    //
+    // New purchases create NEW ticket documents with ACTIVE
+    // status.
+    // ----------------------------------------------------------
+
     await lotteryRef.update({
-      "ticketsSold": 0,
-      "remainingTickets": lotteryData["totalTickets"],
-      "status": "ACTIVE",
-      "nextDrawAt": Timestamp.fromDate(nextDraw),
-      "winnerIds": [], // Clear previous winners
-      "winningTickets": [], // Clear previous winning numbers
+      'ticketsSold': 0,
+      'remainingTickets':
+          lotteryData['totalTickets'],
+      'status': 'ACTIVE',
+      'nextDrawAt':
+          Timestamp.fromDate(nextDraw),
+      'winnerIds': [],
+      'winningTickets': [],
     });
   }
 
-  //==============================
-  // Check All Lotteries
-  //==============================
+  // ============================================================
+  // CHECK ALL LOTTERIES
+  // ============================================================
+
   Future<void> checkAndDrawLotteries() async {
     final now = Timestamp.now();
 
     final snapshot = await _firestore
-        .collection("lotteries")
-        .where("status", isEqualTo: "ACTIVE")
-        .where("nextDrawAt", isLessThanOrEqualTo: now)
+        .collection('lotteries')
+        .where(
+          'status',
+          isEqualTo: 'ACTIVE',
+        )
+        .where(
+          'nextDrawAt',
+          isLessThanOrEqualTo: now,
+        )
         .get();
 
     for (final lottery in snapshot.docs) {
       try {
         await drawLottery(lottery.id);
       } catch (e) {
-        print("Failed drawing ${lottery.id}: $e");
+        print(
+          'Failed drawing ${lottery.id}: $e',
+        );
       }
     }
   }
 
-  //==============================
-  // Save Draw History
-  //==============================
+  // ============================================================
+  // SAVE DRAW HISTORY
+  // ============================================================
+
   Future<void> saveDrawHistory({
     required String lotteryId,
     required Map<String, dynamic> lotteryData,
@@ -303,54 +545,87 @@ class LotteryDrawService {
     required List<int> winningTickets,
   }) async {
     await _firestore
-        .collection("lotteries")
+        .collection('lotteries')
         .doc(lotteryId)
-        .collection("history")
+        .collection('history')
         .add({
-      "drawDate": FieldValue.serverTimestamp(),
-      "winnerIds": winnerIds,
-      "winningTickets": winningTickets,
-      "jackpot": lotteryData["jackpot"],
-      "participants": lotteryData["ticketsSold"],
-      "numberOfWinners": lotteryData["numberOfWinners"],
-      "lotteryType": lotteryData["lotteryType"],
-      "drawFrequency": lotteryData["drawFrequency"],
+      'drawDate':
+          FieldValue.serverTimestamp(),
+      'winnerIds': winnerIds,
+      'winningTickets': winningTickets,
+      'jackpot': lotteryData['jackpot'],
+      'participants':
+          lotteryData['ticketsSold'],
+      'numberOfWinners':
+          lotteryData['numberOfWinners'],
+      'lotteryType':
+          lotteryData['lotteryType'],
+      'drawFrequency':
+          lotteryData['drawFrequency'],
     });
   }
 
-  //==============================
-  // Archive Old Tickets
-  //==============================
+  // ============================================================
+  // ARCHIVE OLD TICKETS
+  // ============================================================
+  //
+  // COPY WON/LOST tickets into:
+  //
+  // users/{userId}/ticketHistory
+  //
+  // BUT KEEP THE ORIGINAL TICKET DOCUMENT.
+  //
+  // This is important because your MyLotteriesScreen reads:
+  //
+  // users/{userId}/tickets
+  //
+  // ============================================================
+
   Future<void> archiveOldTickets({
     required String lotteryId,
   }) async {
     final tickets = await _firestore
-        .collectionGroup("tickets")
-        .where("lotteryID", isEqualTo: lotteryId)
-        .where("status", whereIn: ["WON", "LOST"])
+        .collectionGroup('tickets')
+        .where(
+          'lotteryID',
+          isEqualTo: lotteryId,
+        )
+        .where(
+          'status',
+          whereIn: ['WON', 'LOST'],
+        )
         .get();
+
+    if (tickets.docs.isEmpty) {
+      return;
+    }
 
     final batch = _firestore.batch();
 
     for (final ticket in tickets.docs) {
       final data = ticket.data();
-      final userId = data["userId"];
+
+      final userId =
+          data['userId']?.toString();
+
+      if (userId == null || userId.isEmpty) {
+        continue;
+      }
 
       final historyRef = _firestore
-          .collection("users")
+          .collection('users')
           .doc(userId)
-          .collection("ticketHistory")
+          .collection('ticketHistory')
           .doc(ticket.id);
 
       batch.set(
         historyRef,
         {
           ...data,
-          "archivedAt": FieldValue.serverTimestamp(),
+          'archivedAt':
+              FieldValue.serverTimestamp(),
         },
       );
-
-      batch.delete(ticket.reference);
     }
 
     await batch.commit();

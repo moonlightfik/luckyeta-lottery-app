@@ -22,7 +22,6 @@ class LotteryCard extends StatefulWidget {
 
 class _LotteryCardState extends State<LotteryCard> {
   Timer? timer;
-
   StreamSubscription<DocumentSnapshot>? lotterySubscription;
 
   late Lottery _lottery;
@@ -45,9 +44,9 @@ class _LotteryCardState extends State<LotteryCard> {
     listenForLotteryUpdates();
   }
 
-  //----------------------------------------
+  // ============================================================
   // LISTEN FOR FIRESTORE CHANGES
-  //----------------------------------------
+  // ============================================================
 
   void listenForLotteryUpdates() {
     lotterySubscription = FirebaseFirestore.instance
@@ -57,7 +56,9 @@ class _LotteryCardState extends State<LotteryCard> {
         .listen((snapshot) {
       if (!snapshot.exists) return;
 
-      final data = snapshot.data()!;
+      final data = snapshot.data();
+
+      if (data == null) return;
 
       if (!mounted) return;
 
@@ -72,31 +73,108 @@ class _LotteryCardState extends State<LotteryCard> {
     });
   }
 
-  //----------------------------------------
+  // ============================================================
   // COUNTDOWN
-  //----------------------------------------
+  // ============================================================
 
- void updateCountdown() {
-  if (_lottery.nextDrawAt == null) {
-    return;
-  }
+  void updateCountdown() {
+    if (_lottery.nextDrawAt == null) {
+      if (mounted && remaining != Duration.zero) {
+        setState(() {
+          remaining = Duration.zero;
+        });
+      }
 
-  final difference =
-      _lottery.nextDrawAt!.difference(DateTime.now());
+      return;
+    }
+
+    final difference =
+        _lottery.nextDrawAt!.difference(DateTime.now());
+
     if (!mounted) return;
 
-    setState(() {
-      if (difference.isNegative) {
-        remaining = Duration.zero;
-      } else {
-        remaining = difference;
-      }
-    });
+    final newRemaining =
+        difference.isNegative ? Duration.zero : difference;
+
+    if (remaining != newRemaining) {
+      setState(() {
+        remaining = newRemaining;
+      });
+    }
   }
 
-  //----------------------------------------
+  // ============================================================
+  // STATUS BADGE
+  // ============================================================
+
+  Widget _buildStatusBadge() {
+    final status = _lottery.status;
+
+    Color color;
+    String text;
+    IconData icon;
+
+    switch (status) {
+      case "DRAWING":
+        color = Colors.orange;
+        text = "DRAWING";
+        icon = Icons.casino;
+        break;
+
+      case "COMPLETED":
+        color = Colors.blue;
+        text = "COMPLETED";
+        icon = Icons.check_circle;
+        break;
+
+      case "SOLD_OUT":
+        color = Colors.red;
+        text = "SOLD OUT";
+        icon = Icons.confirmation_number;
+        break;
+
+      case "ACTIVE":
+      default:
+        color = Colors.green;
+        text = "ACTIVE";
+        icon = Icons.play_circle;
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 12,
+        vertical: 7,
+      ),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 15,
+            color: color,
+          ),
+          const SizedBox(width: 5),
+          Text(
+            text,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ============================================================
   // RESET RECURRING LOTTERY
-  //----------------------------------------
+  // ============================================================
 
   Future<void> resetRecurringLottery() async {
     if (_lottery.drawFrequency != "Daily" &&
@@ -104,20 +182,23 @@ class _LotteryCardState extends State<LotteryCard> {
       return;
     }
 
-    DateTime newDrawTime;
-if (_lottery.nextDrawAt == null) {
-  return;
-}
+    if (_lottery.nextDrawAt == null) {
+      return;
+    }
 
-if (_lottery.drawFrequency == "Daily") {
-  newDrawTime = _lottery.nextDrawAt!.add(
-    const Duration(days: 1),
-  );
-} else {
-  newDrawTime = _lottery.nextDrawAt!.add(
-    const Duration(days: 7),
-  );
-}
+    DateTime newDrawTime;
+
+    if (_lottery.drawFrequency == "Daily") {
+      newDrawTime =
+          _lottery.nextDrawAt!.add(
+        const Duration(days: 1),
+      );
+    } else {
+      newDrawTime =
+          _lottery.nextDrawAt!.add(
+        const Duration(days: 7),
+      );
+    }
 
     await FirebaseFirestore.instance
         .collection("lotteries")
@@ -130,32 +211,40 @@ if (_lottery.drawFrequency == "Daily") {
     });
   }
 
-  //----------------------------------------
+  // ============================================================
   // FORMAT TIME
-  //----------------------------------------
+  // ============================================================
 
   String formatTime() {
     String two(int n) =>
         n.toString().padLeft(2, '0');
 
-    return
-        "${two(remaining.inHours)}:"
+    return "${two(remaining.inHours)}:"
         "${two(remaining.inMinutes.remainder(60))}:"
         "${two(remaining.inSeconds.remainder(60))}";
   }
+
+  // ============================================================
+  // DISPOSE
+  // ============================================================
 
   @override
   void dispose() {
     timer?.cancel();
     lotterySubscription?.cancel();
+
     super.dispose();
   }
 
+  // ============================================================
+  // BUILD
+  // ============================================================
+
   @override
   Widget build(BuildContext context) {
-
     final lottery = _lottery;
-        return Card(
+
+    return Card(
       elevation: 5,
       margin: const EdgeInsets.symmetric(
         horizontal: 16,
@@ -165,15 +254,19 @@ if (_lottery.drawFrequency == "Daily") {
         borderRadius: BorderRadius.circular(22),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment:
+            CrossAxisAlignment.start,
         children: [
 
-          // ================= IMAGE =================
+          // ======================================================
+          // IMAGE
+          // ======================================================
 
           Container(
             height: 180,
             decoration: BoxDecoration(
-              borderRadius: const BorderRadius.vertical(
+              borderRadius:
+                  const BorderRadius.vertical(
                 top: Radius.circular(22),
               ),
               image: lottery.imageUrl != null
@@ -188,44 +281,29 @@ if (_lottery.drawFrequency == "Daily") {
                 lottery.themeColor,
               ),
             ),
-
             child: Stack(
               children: [
 
-                // ================= COUNTDOWN =================
+                // =================================================
+                // STATUS
+                // =================================================
 
                 Positioned(
                   top: 15,
                   left: 15,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius:
-                          BorderRadius.circular(20),
-                    ),
-                    child: Text(
-                      lottery.status == "SOLD_OUT"
-                          ? "🎟 SOLD OUT"
-                          : "⏱ ${formatTime()}",
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
+                  child: _buildStatusBadge(),
                 ),
 
-                // ================= CATEGORY =================
+                // =================================================
+                // CATEGORY
+                // =================================================
 
                 Positioned(
                   top: 15,
                   right: 15,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
+                    padding:
+                        const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 6,
                     ),
@@ -236,7 +314,8 @@ if (_lottery.drawFrequency == "Daily") {
                     ),
                     child: Text(
                       "🎁 ${lottery.category}",
-                      style: const TextStyle(
+                      style:
+                          const TextStyle(
                         color: Colors.white,
                         fontWeight:
                             FontWeight.bold,
@@ -245,20 +324,18 @@ if (_lottery.drawFrequency == "Daily") {
                   ),
                 ),
 
-                // ================= CREATOR MENU =================
+                // =================================================
+                // CREATOR MENU
+                // =================================================
 
                 Positioned(
                   bottom: 15,
                   right: 15,
                   child:
-
                       FirebaseAuth.instance.currentUser?.uid ==
                               lottery.creatorId
-
                           ? CreatorLotteryMenu(
-
                               onEdit: () async {
-
                                 await Navigator.push(
                                   context,
                                   MaterialPageRoute(
@@ -268,48 +345,44 @@ if (_lottery.drawFrequency == "Daily") {
                                     ),
                                   ),
                                 );
-
                               },
-
                               onDelete: () {
-
                                 showDialog(
                                   context: context,
-                                  builder: (context) {
-
+                                  builder:
+                                      (context) {
                                     return AlertDialog(
-
-                                      title: const Text(
+                                      title:
+                                          const Text(
                                         "Delete Lottery?",
                                       ),
-
                                       content:
-                                          lottery.ticketsSold > 0
+                                          lottery.ticketsSold >
+                                                  0
                                               ? const Text(
                                                   "Tickets have already been purchased. You cannot delete this lottery.",
                                                 )
                                               : const Text(
                                                   "Are you sure you want to delete this lottery?",
                                                 ),
-
                                       actions: [
-
                                         TextButton(
-                                          onPressed: () {
+                                          onPressed:
+                                              () {
                                             Navigator.pop(
                                                 context);
                                           },
-                                          child: const Text(
+                                          child:
+                                              const Text(
                                             "Cancel",
                                           ),
                                         ),
-
-                                        if (lottery.ticketsSold ==
+                                        if (lottery
+                                                .ticketsSold ==
                                             0)
                                           TextButton(
                                             onPressed:
                                                 () async {
-
                                               await FirebaseFirestore
                                                   .instance
                                                   .collection(
@@ -318,25 +391,26 @@ if (_lottery.drawFrequency == "Daily") {
                                                       lottery.id)
                                                   .delete();
 
-                                              Navigator.pop(
-                                                  context);
-
+                                              if (context
+                                                  .mounted) {
+                                                Navigator.pop(
+                                                    context);
+                                              }
                                             },
-                                            child: const Text(
+                                            child:
+                                                const Text(
                                               "Delete",
-                                              style: TextStyle(
+                                              style:
+                                                  TextStyle(
                                                 color:
                                                     Colors.red,
                                               ),
                                             ),
                                           ),
-
                                       ],
                                     );
-
                                   },
                                 );
-
                               },
                             )
                           : const SizedBox(),
@@ -345,7 +419,9 @@ if (_lottery.drawFrequency == "Daily") {
             ),
           ),
 
-          // ================= DETAILS =================
+          // ======================================================
+          // DETAILS
+          // ======================================================
 
           Padding(
             padding: const EdgeInsets.all(16),
@@ -356,7 +432,8 @@ if (_lottery.drawFrequency == "Daily") {
 
                 Text(
                   lottery.title,
-                  style: const TextStyle(
+                  style:
+                      const TextStyle(
                     fontSize: 18,
                     fontWeight:
                         FontWeight.bold,
@@ -368,7 +445,8 @@ if (_lottery.drawFrequency == "Daily") {
                 Text(
                   "👤 ${lottery.creatorName}",
                   style: TextStyle(
-                    color: Colors.grey.shade700,
+                    color:
+                        Colors.grey.shade700,
                     fontWeight:
                         FontWeight.w500,
                   ),
@@ -382,18 +460,22 @@ if (_lottery.drawFrequency == "Daily") {
                   overflow:
                       TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: Colors.grey.shade700,
+                    color:
+                        Colors.grey.shade700,
                   ),
                 ),
 
                 const SizedBox(height: 15),
+
+                // =================================================
+                // JACKPOT / TICKET PRICE
+                // =================================================
 
                 Row(
                   mainAxisAlignment:
                       MainAxisAlignment
                           .spaceBetween,
                   children: [
-
                     Text(
                       "\$${lottery.jackpot}",
                       style:
@@ -403,7 +485,6 @@ if (_lottery.drawFrequency == "Daily") {
                             FontWeight.bold,
                       ),
                     ),
-
                     Text(
                       "🎟 \$${lottery.pricePerTicket}/ticket",
                       style:
@@ -412,11 +493,14 @@ if (_lottery.drawFrequency == "Daily") {
                             FontWeight.bold,
                       ),
                     ),
-
                   ],
                 ),
 
                 const SizedBox(height: 15),
+
+                // =================================================
+                // PROGRESS
+                // =================================================
 
                 LinearProgressIndicator(
                   value: lottery.progress
@@ -424,7 +508,8 @@ if (_lottery.drawFrequency == "Daily") {
                   minHeight: 8,
                   borderRadius:
                       BorderRadius.circular(
-                          10),
+                    10,
+                  ),
                   backgroundColor:
                       Colors.grey.shade300,
                   valueColor:
@@ -441,94 +526,114 @@ if (_lottery.drawFrequency == "Daily") {
                 Text(
                   "${lottery.ticketsSold}/${lottery.totalTickets} Tickets Sold",
                   style: TextStyle(
-                    color: Colors.grey.shade700,
+                    color:
+                        Colors.grey.shade700,
                     fontWeight:
                         FontWeight.w500,
                   ),
                 ),
 
                 const SizedBox(height: 15),
-                                // ================= DRAW INFO =================
+
+                // =================================================
+                // DRAW INFO
+                // =================================================
 
                 Row(
                   mainAxisAlignment:
-                      MainAxisAlignment.spaceBetween,
+                      MainAxisAlignment
+                          .spaceBetween,
                   children: [
-
                     Row(
                       children: [
-
                         const Icon(
                           Icons.schedule,
                           size: 18,
                         ),
-
-                        const SizedBox(width: 5),
-
-                       Text(
-  lottery.lotteryType == "oneTime"
-      ? "One Time"
-      : lottery.drawFrequency ?? "Unknown",
-  style: const TextStyle(
-    fontWeight: FontWeight.bold,
-  ),
-),
-
+                        const SizedBox(
+                          width: 5,
+                        ),
+                        Text(
+                          lottery.lotteryType ==
+                                  "oneTime"
+                              ? "One Time"
+                              : lottery
+                                      .drawFrequency ??
+                                  "Unknown",
+                          style:
+                              const TextStyle(
+                            fontWeight:
+                                FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
 
                     Row(
                       children: [
-
                         const Icon(
                           Icons.emoji_events,
                           size: 18,
                         ),
-
-                        const SizedBox(width: 5),
-
+                        const SizedBox(
+                          width: 5,
+                        ),
                         Text(
                           "${lottery.numberOfWinners} Winner${lottery.numberOfWinners > 1 ? "s" : ""}",
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
+                          style:
+                              const TextStyle(
+                            fontWeight:
+                                FontWeight.bold,
                           ),
                         ),
-
                       ],
                     ),
-
                   ],
                 ),
 
                 const SizedBox(height: 15),
 
-                // ================= SOLD OUT =================
+                // =================================================
+                // SOLD OUT
+                // =================================================
 
-                if (lottery.status == "SOLD_OUT")
+                if (lottery.status ==
+                    "SOLD_OUT")
                   Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade50,
-                      borderRadius:
-                          BorderRadius.circular(14),
+                    width:
+                        double.infinity,
+                    padding:
+                        const EdgeInsets.all(
+                      12,
                     ),
-                    child: const Center(
+                    decoration:
+                        BoxDecoration(
+                      color:
+                          Colors.red.shade50,
+                      borderRadius:
+                          BorderRadius.circular(
+                        14,
+                      ),
+                    ),
+                    child:
+                        const Center(
                       child: Text(
                         "🎟 SOLD OUT\nTry Next Time",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.red,
-                          fontWeight: FontWeight.bold,
+                        textAlign:
+                            TextAlign.center,
+                        style:
+                            TextStyle(
+                          color:
+                              Colors.red,
+                          fontWeight:
+                              FontWeight.bold,
                         ),
                       ),
                     ),
                   ),
-
               ],
             ),
           ),
-
         ],
       ),
     );
